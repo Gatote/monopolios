@@ -99,8 +99,10 @@ def consulta_dinero(vnombre):
 
     # Cerrar la conexión a la base de datos
     conn.close()
-
-    return int(nombres[0])
+    try:
+        return int(nombres[0])
+    except IndexError:
+        return 0
 
 def tirar_dado(v1):
     # Establecer una conexión a la base de datos
