@@ -248,45 +248,53 @@ def Recibir_Dinero_Banco_Vuelta(v1):
 with st.container():
     st.title('Monopolios')
 
-    recarga=False
-    if st.button('Actualizar'):
-        recargar=True
-        #st.experimental_rerun()
+    # recarga=False
+    # if st.button('Actualizar'):
+    #     recargar=True
+    #     #st.experimental_rerun()
 
+    jugador,contraseña = '',''
+    #ocultar_jugadores = st.checkbox('Ocultar otros jugadores',False,'Ocultar_jugadores','Limpiar pantalla ocultando otros jugadores')
+    with st.expander('Jugadores',False):
+        st.header(body = 'Seleccion de jugador', help = 'Seleccion de jugador')
+        datos_jugador = consulta_jugadores()
+        nombres_jugador = [jugador[0] for jugador in datos_jugador]
+        jugador = st.selectbox('Jugador', nombres_jugador)
+        try:
+            datos_jugador = consultar_datos_jugador(jugador)[0]
+        except:
+            datos_jugador = ['','',0,'',''] 
 
-    st.header(body = 'Seleccion de jugador', help = 'Seleccion de jugador')
-    datos_jugador = consulta_jugadores()
-    nombres_jugador = [jugador[0] for jugador in datos_jugador]
-    jugador = st.selectbox('Jugador', nombres_jugador)
-    try:
-        datos_jugador = consultar_datos_jugador(jugador)[0]
-    except:
-        datos_jugador = ['','',0,'',''] 
+        contraseña = st.text_input('Contraseña', max_chars=50, key='contraseña_acciones', type='password', value='', help='Contraseña para realizar acciones', placeholder="Q7z#n9$8")
 
-    contraseña = st.text_input('Contraseña', max_chars=50, key='contraseña_acciones', type='password', value='', help='Contraseña para realizar acciones', placeholder="Q7z#n9$8")
+        st.header('Datos del jugador', help = 'Datos generales del jugador')
+        st.write(f'Dinero: {datos_jugador[2]}')
+        
+        st.write(f'Pasiva: {datos_jugador[3]}')
 
-    st.header('Datos del jugador', help = 'Datos generales del jugador')
-    st.write(f'Dinero: {datos_jugador[2]}')
-    
-    st.write(f'Pasiva: {datos_jugador[3]}')
-
-    restante = False
-    if datos_jugador[4] != 0:
-        st.write(f'Turnos_restantes: {datos_jugador[4]}')
         restante = False
-    else:
-        st.success(f'Lista para usar!')
-        restante = True
+        if datos_jugador[4] != 0:
+            st.write(f'Turnos_restantes: {datos_jugador[4]}')
+            restante = False
+        else:
+            st.success(f'Lista para usar!')
+            restante = True
         
     if validar_jugador(jugador,contraseña):
         st.title(body = f'Estas jugando como {jugador} ✔')
         st.header(body = 'Pasiva')
         monto_disponible = False
 
-        if st.button('Usar pasiva', disabled = not restante):
-            usar_pasiva(jugador,datos_jugador[3])
-        if st.button('Tirar dados', disabled = restante):
-            tirar_dado(jugador)
+        col1_pasiva, col2_pasiva, col3_pasiva = st.columns(3)
+        with col1_pasiva:
+            if st.button('Usar pasiva', disabled = not restante):
+                usar_pasiva(jugador,datos_jugador[3])
+        with col2_pasiva:
+            if st.button('Tirar dados', disabled = restante):
+                tirar_dado(jugador)
+        with col3_pasiva:
+            if datos_jugador[4] != 0:
+                st.warning(f'Disponible en {datos_jugador[4]} turnos')
 
         st.header('Gastos')
         st.subheader('Propiedades')
