@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 11-05-2023 a las 15:44:02
+-- Tiempo de generación: 11-05-2023 a las 15:49:46
 -- Versión del servidor: 10.4.28-MariaDB
 -- Versión de PHP: 8.2.4
 
@@ -55,8 +55,13 @@ CREATE DEFINER=`admin`@`localhost` PROCEDURE `Pagar_A_Jugador` (IN `jugador1` VA
 END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Pago_A_Banco` (IN `nombre_jugador` VARCHAR(30), IN `monto_a_pagar` INT(6), IN `razón` VARCHAR(30))   BEGIN
-    UPDATE jugadores SET dinero = dinero - monto_a_pagar where nombre = nombre_jugador;
-    INSERT INTO movimientos (accion) VALUES (CONCAT(nombre_jugador, ' pagó al banco por ', razon));
+    IF razon = 'carcel' THEN
+        UPDATE jugadores SET dinero = dinero - 50 where nombre = nombre_jugador;
+        INSERT INTO movimientos (accion) VALUES (CONCAT(nombre_jugador, ' pagó salida de la carcel'));
+    ELSE
+        UPDATE jugadores SET dinero = dinero - monto_a_pagar where nombre = nombre_jugador;
+        INSERT INTO movimientos (accion) VALUES (CONCAT(nombre_jugador, ' pagó al banco ', monto_a_pagar, ' por ', razon));
+    END IF;
 END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Recibir_Dinero_Banco` (IN `v1` VARCHAR(30), IN `v2` INT(6), IN `v3` VARCHAR(20))   BEGIN
