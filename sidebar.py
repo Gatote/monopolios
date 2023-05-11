@@ -3,6 +3,26 @@ import streamlit as st
 import pandas as pd
 import time
 
+def ver_pasivas():
+    # Establecer una conexión a la base de datos
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="admin",
+        password="admin",
+        database="monopolios"
+    )
+    # Crear un cursor para ejecutar comandos en la base de datos
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT nombre FROM pasivas")
+    resultados = cursor.fetchall()
+
+    nombres = [resultado[0] for resultado in resultados]
+
+    # Cerrar la conexión a la base de datos
+    conn.close()
+    return nombres
+
 def consulta_movimientos():
     # Establecer una conexión a la base de datos
     conn = mysql.connector.connect(
@@ -72,21 +92,66 @@ def nuevo_juego(confirmar1, confirmar2):
     # Cerrar la conexión a la base de datos
     conn.close()
 
+def agregar_jugador(v1, v2, v3, v4):
+    # Establecer una conexión a la base de datos
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="admin",
+        password="admin",
+        database="monopolios"
+    )
+    # Crear un cursor para ejecutar comandos en la base de datos
+    cursor = conn.cursor()
+
+    # Hacer un SELECT
+    cursor.callproc('crear_jugador', (v1, v2, int(v3), v4))
+    conn.commit()
+
+    # Cerrar la conexión a la base de datos
+    conn.close()
 
 def main():
     with st.sidebar:
         st.title('Gato')
         st.subheader('Movimientos')
         mov=pd.DataFrame(consulta_movimientos(),columns=['Accion'])
-        st.table(mov)
+        #st.table(mov)
+        container = st.container()
+        with container:
+            st.write(mov.style.set_table_attributes('style="max-height: 500px; overflow-y: auto;"'))
         
         st.subheader('Jugadores')
         jugadores=pd.DataFrame(consulta_jugadores(),columns=('Jugador','Dinero','Pasiva','CD'))
         st.table(jugadores)
 
-        with st.expander('Reseteo',expanded=False):
-            t_confirmar1=st.text_input('Pass 1',key='txt_reseteo1')    
-            t_confirmar2=st.text_input('Pass 2',key='txt_reseteo2')
+                
+        with st.expander('Crear usuario'):
+            jugador_nombre = st.text_input('Nombre',"",30,None,"default","Nombre que aparecera dentro del juego",None,None,None,None,placeholder="Shadow")
+
+            jugador_contraseña = st.text_input('Conrtaseña',"",50,None,"password","Contraseña para realizar acciones dentro del juego.",placeholder="Q7z#n9$8")
+
+            jugador_dinero = st.number_input('Dinero',0,999999,1500,100,help='Cantidad de dinero con la que comenzará el jugador')
+
+            pasivas = ver_pasivas()
+            jugador_pasiva = st.selectbox('Pasiva',pasivas,help='Pasiva con la que se jugará la partida')
+
+
+            if jugador_nombre == None or jugador_contraseña == None:
+                st.warning('Establece un nokmbre de jugador y contraseña')
+            else:
+                if st.button('Registrar jugador'):
+                    try:
+                        agregar_jugador(jugador_nombre,jugador_contraseña,jugador_dinero,jugador_pasiva)
+                        st.succes(f"El jugador {jugador_nombre} entro al juego")
+                        time.sleep(1)
+                    except:
+                        st.warning('Establece un nokmbre de jugador y contraseña')
+
+
+                    
+        with st.expander('Desarrollador',expanded=False):
+            t_confirmar1=st.text_input('Pass 1',key='txt_reseteo1',type='password')    
+            t_confirmar2=st.text_input('Pass 2',key='txt_reseteo2',type='password')
             if st.button('Confirmar',key='btn_resteo'):
                 nuevo_juego(t_confirmar1,t_confirmar2)
                 st.success("La venta ha sido agregada correctamente")
