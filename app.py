@@ -164,45 +164,6 @@ def usar_pasiva(v1,v2):
     time.sleep(1)
     st.experimental_rerun()
 
-def Comprar_Propiedad(v1,v2):
-    # Establecer una conexión a la base de datos
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="admin",
-        password="admin",
-        database="monopolios"
-    )
-    # Crear un cursor para ejecutar comandos en la base de datos
-    cursor = conn.cursor()
-
-    # Hacer un SELECT
-    cursor.callproc('Comprar_Propiedad', (v1,v2))
-    conn.commit()
-    
-    # Cerrar la conexión a la base de datos
-    conn.close()
-    time.sleep(1)
-    st.experimental_rerun()
-
-def Pagar_A_Jugador(v1,v2,v3):
-    # Establecer una conexión a la base de datos
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="admin",
-        password="admin",
-        database="monopolios"
-    )
-    # Crear un cursor para ejecutar comandos en la base de datos
-    cursor = conn.cursor()
-
-    # Hacer un SELECT
-    cursor.callproc('Pagar_A_Jugador', (v1,v2,v3))
-    conn.commit()
-    
-    # Cerrar la conexión a la base de datos
-    conn.close()
-    time.sleep(1)
-    st.experimental_rerun()
 
 def Recibir_Dinero_Banco(v1,v2,v3):
     # Establecer una conexión a la base de datos
@@ -244,9 +205,37 @@ def Recibir_Dinero_Banco_Vuelta(v1):
     time.sleep(1)
     st.experimental_rerun()
 
+def Pagar_A_Banco(Nombre_Jugador,Monto_A_Pagar_Banco):
+    # Establecer una conexión a la base de datos
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="admin",
+        password="admin",
+        database="monopolios"
+    )
+    # Crear un cursor para ejecutar comandos en la base de datos
+    cursor = conn.cursor()
+
+    # Hacer un SELECT
+    cursor.callproc('Pagar_A_Banco', (Nombre_Jugador,Monto_A_Pagar_Banco))
+    conn.commit()
+    
+    # Cerrar la conexión a la base de datos
+    conn.close()
+    time.sleep(1)
+    st.experimental_rerun()
 
 with st.container():
     st.title('Monopolios')
+
+    with st.expander('Pasivas'):
+            df = pd.read_csv('pasivas.csv')
+            #cambiar indice
+            df = df.set_index('nombre')
+            # Cambiar el nombre de las columnas
+            df = df.rename(columns={'nombre': 'Pasiva', 'descripcion': 'Descripcion', 'enfriamiento': 'Enfriamiento', 'extras': 'Extras'})
+
+            st.table(df)
 
     # recarga=False
     # if st.button('Actualizar'):
@@ -255,7 +244,7 @@ with st.container():
 
     jugador,contraseña = '',''
     #ocultar_jugadores = st.checkbox('Ocultar otros jugadores',False,'Ocultar_jugadores','Limpiar pantalla ocultando otros jugadores')
-    with st.expander('Jugadores',False):
+    with st.expander('Logueo',False):
         st.header(body = 'Seleccion de jugador', help = 'Seleccion de jugador')
         datos_jugador = consulta_jugadores()
         nombres_jugador = [jugador[0] for jugador in datos_jugador]
@@ -264,17 +253,21 @@ with st.container():
             datos_jugador = consultar_datos_jugador(jugador)[0]
         except:
             datos_jugador = ['','',0,'',''] 
+        Nombre_Jugador = datos_jugador[0]
+        Dinero_Jugador = datos_jugador[2]
+        Nombre_Pasiva_Jugador = datos_jugador[3]
+        Enfriamiento_Pasiva_Jugador = datos_jugador[4]
 
         contraseña = st.text_input('Contraseña', max_chars=50, key='contraseña_acciones', type='password', value='', help='Contraseña para realizar acciones', placeholder="Q7z#n9$8")
 
         st.header('Datos del jugador', help = 'Datos generales del jugador')
-        st.write(f'Dinero: {datos_jugador[2]}')
+        st.write(f'Dinero: {Dinero_Jugador}')
         
-        st.write(f'Pasiva: {datos_jugador[3]}')
+        st.write(f'Pasiva: {Nombre_Pasiva_Jugador}')
 
         restante = False
-        if datos_jugador[4] != 0:
-            st.write(f'Turnos_restantes: {datos_jugador[4]}')
+        if Enfriamiento_Pasiva_Jugador != 0:
+            st.write(f'Turnos_restantes: {Enfriamiento_Pasiva_Jugador}')
             restante = False
         else:
             st.success(f'Lista para usar!')
@@ -288,47 +281,31 @@ with st.container():
         col1_pasiva, col2_pasiva, col3_pasiva = st.columns(3)
         with col1_pasiva:
             if st.button('Usar pasiva', disabled = not restante):
-                usar_pasiva(jugador,datos_jugador[3])
+                usar_pasiva(jugador,Nombre_Pasiva_Jugador)
         with col2_pasiva:
             if st.button('Tirar dados', disabled = restante):
                 tirar_dado(jugador)
         with col3_pasiva:
-            if datos_jugador[4] != 0:
-                st.warning(f'Disponible en {datos_jugador[4]} turnos')
+            if Enfriamiento_Pasiva_Jugador != 0:
+                st.warning(f'Disponible en {Enfriamiento_Pasiva_Jugador} turnos')
 
         st.header('Gastos')
         st.subheader('Propiedades')
-        col1_propiedad,col2_propiedad = st.columns(2)
-        with col1_propiedad:
-            valor_propiedad = st.number_input(label = 'Costo de propiedad',min_value = 10,  max_value = 999999, value = 10, step = 10, help = 'Total de costo de propiedad', key = 'valorpropiedad')
-            if valor_propiedad <= datos_jugador[2]:
-                monto_disponible = True
-            else:
-                monto_disponible = False
-        with col2_propiedad:
-            if not monto_disponible:
-                st.error('No tienes suficiente dinero')
-            elif st.button(label = 'Comprar', help = 'Comprar propiedad', disabled = not monto_disponible):
-                Comprar_Propiedad(jugador,valor_propiedad)
+        from comprar_propiedad import main as comprar_propiedad_main
+        comprar_propiedad_main(jugador, Dinero_Jugador)
 
         st.subheader('Pagos a jugadores')
-        col1_pago,col2_pago,col3_pago = st.columns(3)
-        with col1_pago:
-            valor_pago = st.number_input(label = 'Valor de pago',min_value = 1,  max_value = 999999, value = 1, step = 1, help = 'Total de pago a jugador',key='valorpago')
-            if valor_pago <= datos_jugador[2]:
-                monto_disponible = True
-            else:
-                monto_disponible = False
-        with col2_pago:
-            jugador2 = st.selectbox('Jugador a pagar', nombres_jugador)
-        with col3_pago:
-            if not monto_disponible:
-                st.error('No tienes suficiente dinero')
-            elif jugador == jugador2:
-                st.warning('No te puedes pagar a ti mismo')
-            elif st.button(label = 'Pagar', help = 'Pagar a jugador', disabled = not monto_disponible):
-                
-                Pagar_A_Jugador(jugador,jugador2,valor_pago)
+        from Pagos_A_Jugadores import main as Pagos_A_Jugadores_main
+        Pagos_A_Jugadores_main(Nombre_Jugador, Dinero_Jugador)
+
+        st.subheader('Pagos al banco')
+        col1_pago_banco,col2_pago_banco = st.columns(2)
+        with col1_pago_banco:
+            Monto_A_Pagar_Banco = st.number_input('Cantidad',0,999999,0,1)
+        with col2_pago_banco:
+            if st.button(f'Pagar {Monto_A_Pagar_Banco}', disabled = not Monto_A_Pagar_Banco > 0):
+                Pagar_A_Banco(Nombre_Jugador,Monto_A_Pagar_Banco)
+        
 
         st.header('Cobros')
         st.subheader('Banco')
@@ -345,8 +322,12 @@ with st.container():
         
 
 
+        with st.expander('derrota'):
+            st.button('Abandonar')
 
-
+            if st.button('Abandonar y compartir'):
+                st.write('Al confirmar darás todo tu dinero, tus propiedades se devolveran al banco y se repartirá al resto de jugadores')
+                st.text_input('Escribe Confirmar')
 
 
 

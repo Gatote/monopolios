@@ -1,0 +1,16 @@
+nombre,descripcion,enfriamiento,extras
+Propiedades iniciales,4 propiedades aleatorias gratis al comenzar.,0,"Se puede elegir una, pero se reduce el numero a 3 propiedades"
+Rentabilidad Aumentada.,Al momento de cobrar renta se cobra como con 3 casas.,4,"El numero de casas adicional es fijo, se puede robar y evadir por otros jugadores"
+Movilidad,"+1 dado con 3 casillas en la jugada, se cuenta como dado adicional.",3,Se puede usar con el dado veloz (dado rojo)
+Duelo,Ambos tiran los dados y el que pierde le paga 100$ al otro jugador.,3,el jugador que usa la habilidad está con ventaja de de 3
+Compra ventajosa,Propiedades por mitad de precio,0,Al ganar subasta tambíen se paga la mitad de lo establecido.
+Dia de suerte,No pagar renta.,5,Puede anular 'Bonanza'
+Constructor,Se obtiene un casa gratis,3,"Se activa al obtener un grupo de color, pero se pueden acumular 2, no incluye hoteles."
+Señor de las cartas,Tomar carta y poder guardarla en secreto (max 2),2,Se puede dar a otro jugador.
+Doble recompensa,Duplicar dinero obtenido.,3,"Se puedee usar en 'parada libre', entre otros, no aplica en rentas."
+Inmunidad a impuestos,"No pagar impuestos, bonos por grupos de color, y cartas de fortuna y arca comunal.",0,no incluye renta de casas y hoteles.
+Reposicionamiento,Mover el token a una casilla.,5,"Se debe realizar la acción de la misma (sin limites), no hay excepcion de casilla"
+Cambio de roles,Cambiar la posición del token con otro jugador.,3,"El otro jugador no realiza ninguna acción, no afecta en el primer turno para la salida"
+Policia,Poder encarcelar a un jugador o encarcelarse a si mismo.,4,"No pagar por salida de la carcel, cobrar mientras está en la carcel (en caso de aplicar)"
+Bonos,Obtener 100$.,2,Puede se robado por otros jugadores1
+Saqueador,Robar una transacción,4,"No aplica al pagar renta propia, en la compra de una propiedad el que la compró recibe su propiedad."

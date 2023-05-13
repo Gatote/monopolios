@@ -112,15 +112,23 @@ def agregar_jugador(v1, v2, v3, v4):
 
 def main():
     with st.sidebar:
-        st.title('Gato')
-        st.subheader('Movimientos')
+        st.title('Monopolios')
+        col1_movimientos, col2_movimientos = st.columns(2)
+        with col1_movimientos:
+            st.subheader('Movimientos')
+        with col2_movimientos:
+            st.button('Recargar', key = 'recargar 1')
         mov=pd.DataFrame(consulta_movimientos(),columns=['Accion'])
         #st.table(mov)
         container = st.container()
         with container:
             st.write(mov.style.set_table_attributes('style="max-height: 500px; overflow-y: auto;"'))
         
-        st.subheader('Jugadores')
+        col1_jugadores, col2_jugadores = st.columns(2)
+        with col1_jugadores:
+            st.subheader('Jugadores')
+        with col2_jugadores:
+            st.button('Recargar', key = 'recargar 2')
         jugadores=pd.DataFrame(consulta_jugadores(),columns=('Jugador','Dinero','Pasiva','CD'))
         st.table(jugadores)
 
@@ -142,10 +150,14 @@ def main():
                 if st.button('Registrar jugador'):
                     try:
                         agregar_jugador(jugador_nombre,jugador_contraseña,jugador_dinero,jugador_pasiva)
-                        st.succes(f"El jugador {jugador_nombre} entro al juego")
+                        #st.succes(f"El jugador {jugador_nombre} entro al juego")
+                        st.success(f'{jugador_nombre} entro al juego!')
                         time.sleep(1)
+                        st.experimental_rerun()
                     except:
-                        st.warning('Establece un nokmbre de jugador y contraseña')
+                        st.warning('Jugador agregado!')
+                        time.sleep(1)
+                        st.experimental_rerun()
 
 
                     
