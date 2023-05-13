@@ -87,16 +87,22 @@ def Comprar_Propiedad(Nombre_Jugador, Dinero_Jugador, Nombre_Propiedad, Precio_P
 def main(Nombre_Jugador,Dinero_Jugador):
     propiedades_disponibles = Consultar_Propiedades_Disponibles()
     if not propiedades_disponibles:
-        st.warning('NO HAY PROPIEDADES DISPONIBLES PARA LA VENTA')
+        st.succes('Tratos con jugadores disponibles!')
+        return True
     else:
+        col1_comprar_propiedad,col2_comprar_propiedad = st.columns(2)
         opciones = [f"{nombre} {emoji}" for nombre, emoji in propiedades_disponibles]
-        Propiedad_Seleccionada_A_Comprar = st.selectbox('Propiedad', opciones)
-        emojis = list(colores_emoji.values())
-        for i in emojis:
-            Propiedad_Seleccionada_A_Comprar = Propiedad_Seleccionada_A_Comprar.replace(f" {i}","")
-        
-        Precio_Propiedad = Consultar_Precio_Propiedad_Disponible(Propiedad_Seleccionada_A_Comprar)
-        Nombre_Propiedad = Propiedad_Seleccionada_A_Comprar
-        if st.button(f'Pagar {Precio_Propiedad}', disabled = Dinero_Jugador < Precio_Propiedad ):
-            Comprar_Propiedad(Nombre_Jugador, Dinero_Jugador, Nombre_Propiedad, Precio_Propiedad)
+        with col1_comprar_propiedad:
+            Propiedad_Seleccionada_A_Comprar = st.selectbox('Propiedad', opciones)
 
+        with col2_comprar_propiedad:
+            emojis = list(colores_emoji.values())
+            for i in emojis:
+                Propiedad_Seleccionada_A_Comprar = Propiedad_Seleccionada_A_Comprar.replace(f" {i}","")
+            
+            Precio_Propiedad = Consultar_Precio_Propiedad_Disponible(Propiedad_Seleccionada_A_Comprar)
+            Nombre_Propiedad = Propiedad_Seleccionada_A_Comprar
+            if st.button(f'Pagar {Precio_Propiedad}', disabled = Dinero_Jugador < Precio_Propiedad ):
+                Comprar_Propiedad(Nombre_Jugador, Dinero_Jugador, Nombre_Propiedad, Precio_Propiedad)
+
+    return False
