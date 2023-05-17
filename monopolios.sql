@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 13-05-2023 a las 23:38:17
+-- Tiempo de generación: 14-05-2023 a las 23:19:04
 -- Versión del servidor: 10.4.28-MariaDB
 -- Versión de PHP: 8.2.4
 
@@ -26,7 +26,7 @@ DELIMITER $$
 -- Procedimientos
 --
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Comprar_Casa` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN
-    UPDATE jugadores SET dinero = dinero - (SELECT precio FROM propiedades WHERE nombre = Nombre_Propiedad);
+    UPDATE jugadores SET dinero = dinero - (SELECT costo_casa FROM propiedades WHERE nombre = Nombre_Propiedad) WHERE nombre = (SELECT dueño FROM propiedades WHERE nombre = Nombre_Propiedad);
 	UPDATE propiedades SET nivel_renta = nivel_renta + 1 WHERE nombre = Nombre_Propiedad;
     INSERT INTO movimientos(ACCION) VALUES(CONCAT(Nombre_Propiedad, ' tiene una casa mas!'));
 
@@ -36,35 +36,45 @@ CREATE DEFINER=`admin`@`localhost` PROCEDURE `Comprar_Propiedad` (IN `nombre_jug
     IF vdinero_jugador >= vcosto_propiedad THEN
         UPDATE propiedades SET dueño = nombre_jugador WHERE nombre = nombre_propiedad;
         UPDATE jugadores SET dinero = dinero - vcosto_propiedad WHERE nombre = nombre_jugador;
-        INSERT INTO movimientos (accion) VALUES (concat(nombre_jugador, ' compró ', nombre_propiedad, ' dinero: ',  (SELECT dinero FROM jugadores WHERE nombre = nombre_jugador)));
+        INSERT INTO movimientos (accion) VALUES (concat(nombre_jugador, ' compró ', nombre_propiedad));
     END IF;
 END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Consultar_Dinero_Neto` (IN `Nombre_Jugador` VARCHAR(30))   SELECT (SELECT dinero FROM jugadores WHERE nombre COLLATE utf8mb4_general_ci = Nombre_Jugador COLLATE utf8mb4_general_ci) + 
+(IFNULL((SELECT SUM(hipoteca) FROM propiedades WHERE dueño COLLATE utf8mb4_general_ci = Nombre_Jugador COLLATE utf8mb4_general_ci AND hipotecado = 0), 0))$$
 
 CREATE DEFINER=`admin`@`localhost` PROCEDURE `Crear_Jugador` (IN `vnombre` VARCHAR(30), IN `vpass` VARCHAR(50), IN `vdinero` INT(6), IN `vpasiva` VARCHAR(50))  COMMENT 'agregar un jugador y asignarle pasiva' BEGIN
     IF vnombre = '' OR vpass = '' THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Nombre y contraseña son obligatorios';
     ELSE
-        INSERT INTO jugadores (nombre, contraseña, dinero, pasiva, turnos_restantes) 
-        VALUES (vnombre, vpass, vdinero, vpasiva, 0);
-        INSERT INTO movimientos (ACCION) 
-        VALUES (CONCAT(vnombre, ' se unió, Dinero: $', vdinero, ' Pasiva: ', vpasiva));
+        IF vpasiva <> '' THEN
+            INSERT INTO jugadores (nombre, contraseña, dinero, pasiva, turnos_restantes) 
+            VALUES (vnombre, vpass, vdinero, vpasiva, 0);
+            INSERT INTO movimientos (ACCION) 
+            VALUES (CONCAT(vnombre, ' se unió, Dinero: $', vdinero, ' Pasiva: ', vpasiva));
+        ELSE
+            INSERT INTO jugadores (nombre, contraseña, dinero, pasiva, turnos_restantes) 
+            VALUES (vnombre, vpass, vdinero, vpasiva, 0);
+            INSERT INTO movimientos (ACCION) 
+            VALUES (CONCAT(vnombre, ' se unió, Dinero: $', vdinero));
+        END IF;
     END IF;
 END$$
 
-CREATE DEFINER=`admin`@`localhost` PROCEDURE `hipotecar_propiedad` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN
+CREATE DEFINER=`admin`@`localhost` PROCEDURE `Hipotecar_Propiedad` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN
     UPDATE propiedades SET hipotecado = 1 where nombre = Nombre_Propiedad;
     UPDATE jugadores SET dinero = dinero + (SELECT hipoteca FROM propiedades WHERE nombre = Nombre_Propiedad);
     INSERT INTO movimientos (accion) VALUES (CONCAT((SELECT dueño FROM propiedades WHERE nombre = Nombre_Propiedad), ' hipoteco ', Nombre_Propiedad));
 END$$
 
-CREATE DEFINER=`admin`@`localhost` PROCEDURE `Nuevo_Juego` (IN `confirmar1` VARCHAR(9), IN `confirmar2` VARCHAR(9))   IF confirmar1 = 'Confirmar' AND confirmar2 = 'Confirmar' THEN
+CREATE DEFINER=`admin`@`localhost` PROCEDURE `Nuevo_Juego` (IN `v_impuestos_para_parada_libre` BOOLEAN, IN `v_dinero_inicio_personaliazdo` BOOLEAN, IN `v_dinero_inicio` INT, IN `v_bono_salida` BOOLEAN, IN `v_pasivas_activas` BOOLEAN, IN `v_modo_exponencial` BOOLEAN, IN `v_jugador_moderador` VARCHAR(30))   BEGIN
     TRUNCATE TABLE jugadores;
     TRUNCATE TABLE MOVIMIENTOS;
     SELECT 'Limpiadas tablas de jugadores y movimientos' AS COMPLETADO;
     INSERT INTO movimientos (accion) VALUES ('Comienza el juego'); 
-    UPDATE propiedades SET dueño = NULL, hipotecado = 0;
-    UPDATE variables SET parada_libre = 0;
-END IF$$
+    UPDATE propiedades SET dueño = NULL, hipotecado = 0, nivel_renta = 1;
+    UPDATE variables SET impuestos_para_parada_libre = v_impuestos_para_parada_libre, dinero_inicio_personalizado = v_dinero_inicio_personaliazdo, dinero_inicio = v_dinero_inicio, acomulado_parada_libre = 0, bono_salida = v_bono_salida, pasivas_activas = v_pasivas_activas, modo_exponencial = v_modo_exponencial, jugador_moderador = v_jugador_moderador, multiplicador_exponencial = 1;
+END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Pagar_A_Banco` (IN `Nombre_Jugador` VARCHAR(30), IN `Monto_A_Pagar` INT(6))   BEGIN
 	UPDATE jugadores SET DINERO = DINERO - Monto_A_Pagar WHERE nombre = Nombre_Jugador;
@@ -82,11 +92,16 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `Pagar_Carcel` (IN `Nombre_Jugador` 
     INSERT INTO movimientos (accion) VALUES (CONCAT(Nombre_Jugador, ' pago salida de carcel')); 
 END$$
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `Pagar_impuestos` (IN `Nombre_Jugador` VARCHAR(30), IN `Monto_A_Pagar` INT(6))   BEGIN
-    UPDATE jugadores SET dinero = dinero - Monto_A_Pagar where nombre = Nombre_Jugador;
-    UPDATE variables SET parada_libre = parada_libre + Monto_A_Pagar;
-    INSERT INTO movimientos (accion) VALUES (CONCAT(Nombre_Jugador, ' sumó ', Monto_A_Pagar, ' a parada libre'));
-    INSERT INTO movimientos (accion) VALUES (CONCAT('Premio parada libre: ', (SELECT parada_libre FROM variables)));
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Pagar_impuestos` (IN `Nombre_Jugador` VARCHAR(30), IN `Monto_A_Pagar` INT(6), IN `Impuestos_Para_Parada_Libre` BOOLEAN)   BEGIN
+	IF Impuestos_Para_Parada_libre = 1 THEN
+        UPDATE jugadores SET dinero = dinero - Monto_A_Pagar where nombre = Nombre_Jugador;
+        UPDATE variables SET acomiulado_parada_libre = acomulado_parada_libre + Monto_A_Pagar;
+        INSERT INTO movimientos (accion) VALUES (CONCAT(Nombre_Jugador, ' sumó ', Monto_A_Pagar, ' a parada libre'));
+        INSERT INTO movimientos (accion) VALUES (CONCAT('Premio parada libre: ', (SELECT parada_libre FROM variables)));
+    ELSE
+        UPDATE jugadores SET dinero = dinero - Monto_A_Pagar where nombre = Nombre_Jugador;
+        INSERT INTO movimientos (accion) VALUES (CONCAT(Nombre_Jugador, ' pagó ', Monto_A_Pagar, ' de impuestos'));
+    END IF;
 END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Pago_A_Banco` (IN `nombre_jugador` VARCHAR(30), IN `monto_a_pagar` INT(6), IN `razón` VARCHAR(30))   BEGIN
@@ -105,9 +120,17 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `Recibir_Dinero_Banco` (IN `v1` VARC
 END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Recibir_Dinero_Vuelta` (IN `nombre_jugador` VARCHAR(30))   BEGIN
-    UPDATE jugadores SET dinero = dinero + 200 WHERE nombre = nombre_jugador;
-    #UPDATE jugadores SET dinero = dinero - 100 WHERE NOT nombre = nombre_jugador;
-    INSERT INTO movimientos (accion) VALUES (CONCAT(nombre_jugador, ' recibio $200 por dar una vuelta!'));
+	IF (SELECT modo_exponencial FROM variables) = 0 THEN
+	    UPDATE jugadores SET dinero = dinero + 200 WHERE nombre = nombre_jugador;
+    	INSERT INTO movimientos (accion) VALUES (CONCAT(nombre_jugador, ' recibio $200 por dar una vuelta!'));
+    ELSE
+	    UPDATE jugadores SET dinero = dinero + 200 WHERE nombre = nombre_jugador;
+    	INSERT INTO movimientos (accion) VALUES (CONCAT(nombre_jugador, ' recibio $200 por dar una vuelta!'));
+    	IF (SELECT JUGADOR_MODERADOR FROM VARIABLES) = nombre_jugador THEN
+	    	UPDATE VARIABLES SET multiplicador_exponencial = multiplicador_exponencial * 2;
+    		INSERT INTO movimientos (accion) VALUES (CONCAT('Rentas ahora son x', (SELECT multiplicador_exponencial FROM variables)));
+        END IF;
+    END IF;
 END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Recibir_Dinero_Vuelta_Doble` (IN `Nombre_Jugador` VARCHAR(30))   BEGIN 
@@ -159,6 +182,13 @@ END$$
 
 CREATE DEFINER=`admin`@`localhost` PROCEDURE `validar_usuario` (IN `vnombre` VARCHAR(30), IN `vpass` VARCHAR(50))   SELECT count(*) FROM jugadores where nombre = vnombre AND contraseña = vpass$$
 
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Vender_Casa` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN
+    UPDATE jugadores SET dinero = dinero + (SELECT costo_casa / 2 FROM propiedades WHERE nombre = Nombre_Propiedad) WHERE nombre = (SELECT dueño FROM propiedades WHERE nombre = Nombre_Propiedad);
+	UPDATE propiedades SET nivel_renta = nivel_renta - 1 WHERE nombre = Nombre_Propiedad;
+    INSERT INTO movimientos(ACCION) VALUES(CONCAT(Nombre_Propiedad, ' tiene una casa menos!'));
+
+END$$
+
 DELIMITER ;
 
 -- --------------------------------------------------------
@@ -171,8 +201,8 @@ CREATE TABLE `jugadores` (
   `nombre` varchar(30) NOT NULL,
   `contraseña` varchar(50) NOT NULL,
   `dinero` int(11) NOT NULL,
-  `pasiva` varchar(50) NOT NULL,
-  `turnos_restantes` int(2) NOT NULL,
+  `pasiva` varchar(50) DEFAULT NULL,
+  `turnos_restantes` int(2) DEFAULT NULL,
   `activo` tinyint(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -181,10 +211,8 @@ CREATE TABLE `jugadores` (
 --
 
 INSERT INTO `jugadores` (`nombre`, `contraseña`, `dinero`, `pasiva`, `turnos_restantes`, `activo`) VALUES
-('bruno', 'gato', 0, 'Bonos', 0, 0),
-('gato', 'gato', 0, 'Bonos', 0, 0),
-('gato2', 'gato', 0, 'Bonos', 0, 0),
-('polo', 'gato', 3000, 'Bonos', 0, 1);
+('gato', 'gato', 1364, NULL, 0, 1),
+('polo', 'gato', 1196, NULL, 0, 1);
 
 -- --------------------------------------------------------
 
@@ -203,14 +231,31 @@ CREATE TABLE `movimientos` (
 --
 
 INSERT INTO `movimientos` (`id`, `accion`, `tiempo`) VALUES
-(1, 'Comienza el juego', '2023-05-13 15:17:23'),
-(2, 'gato se unió, Dinero: $1500 Pasiva: Bonos', '2023-05-13 15:17:29'),
-(3, 'polo se unió, Dinero: $1500 Pasiva: Bonos', '2023-05-13 15:17:35'),
-(4, 'bruno se unió, Dinero: $1500 Pasiva: Bonos', '2023-05-13 15:17:46'),
-(5, 'gato se rindio, compartiendo 750 a todos los jugadores', '2023-05-13 15:24:25'),
-(6, 'gato2 se unió, Dinero: $1500 Pasiva: Bonos', '2023-05-13 15:24:47'),
-(7, 'gato2 se rindio, compartiendo 750 a todos los jugadores', '2023-05-13 15:25:02'),
-(8, 'bruno se rindió y todo su dinero y propiedades pasan a ser del banco', '2023-05-13 15:26:37');
+(1, 'Comienza el juego', '2023-05-14 14:07:37'),
+(2, 'gato se unió, Dinero: $1500', '2023-05-14 14:07:37'),
+(3, 'polo se unió, Dinero: $1500', '2023-05-14 14:07:45'),
+(4, 'Rentas ahora son x2', '2023-05-14 14:07:55'),
+(5, 'Rentas ahora son x4', '2023-05-14 14:09:22'),
+(6, 'Rentas ahora son x8', '2023-05-14 14:10:03'),
+(7, 'Rentas ahora son x16', '2023-05-14 14:15:15'),
+(8, 'polo recibio $200 por dar una vuelta!', '2023-05-14 14:16:22'),
+(9, 'polo recibio $200 por dar una vuelta!', '2023-05-14 14:16:25'),
+(10, 'gato recibio $200 por dar una vuelta!', '2023-05-14 14:16:31'),
+(11, 'Rentas ahora son x32', '2023-05-14 14:16:31'),
+(12, 'polo compró Avenida Mediterraneo dinero: 1840', '2023-05-14 14:27:02'),
+(13, 'polo compró Avenida Baltica dinero: 1780', '2023-05-14 14:27:04'),
+(14, 'polo compró Ferrocarril de Reading dinero: 1580', '2023-05-14 14:27:06'),
+(15, 'polo compró Avenida Oriental dinero: 1480', '2023-05-14 14:27:22'),
+(16, 'polo compró Compañía de Electricidad dinero: 1330', '2023-05-14 14:27:27'),
+(17, 'gato pagó $2 a polo', '2023-05-14 14:59:02'),
+(18, 'gato pagó $64 a polo', '2023-05-14 15:00:48'),
+(19, 'polo compró Ferrocarril Pensilvania dinero: 1196', '2023-05-14 15:03:20'),
+(20, 'gato compró Avenida Vermont dinero: 1534', '2023-05-14 15:04:20'),
+(21, 'Avenida Vermont tiene una casa mas!', '2023-05-14 15:04:24'),
+(22, 'Avenida Vermont tiene una casa mas!', '2023-05-14 15:04:27'),
+(23, 'gato compró Avenida Connecticut', '2023-05-14 15:04:59'),
+(24, 'Avenida Vermont tiene una casa menos!', '2023-05-14 15:05:18'),
+(25, 'Avenida Vermont tiene una casa menos!', '2023-05-14 15:05:20');
 
 -- --------------------------------------------------------
 
@@ -219,6 +264,7 @@ INSERT INTO `movimientos` (`id`, `accion`, `tiempo`) VALUES
 --
 
 CREATE TABLE `pasivas` (
+  `id` int(2) NOT NULL,
   `nombre` varchar(50) NOT NULL,
   `descripcion` varchar(100) NOT NULL,
   `enfriamiento` int(2) NOT NULL,
@@ -229,22 +275,22 @@ CREATE TABLE `pasivas` (
 -- Volcado de datos para la tabla `pasivas`
 --
 
-INSERT INTO `pasivas` (`nombre`, `descripcion`, `enfriamiento`, `extras`) VALUES
-('Bonos', 'Obtener 100$.', 2, 'Puede se robado por otros jugadores1'),
-('Cambio de roles', 'Cambiar la posición del token con otro jugador.', 3, 'El otro jugador no realiza ninguna acción, no afecta en el primer turno para la salida'),
-('Compra ventajosa', 'Propiedades por mitad de precio', 0, 'Al ganar subasta tambíen se paga la mitad de lo establecido.'),
-('Constructor', 'Se obtiene un casa gratis', 3, 'Se activa al obtener un grupo de color, pero se pueden acumular 2, no incluye hoteles.'),
-('Dia de suerte', 'No pagar renta.', 5, 'Puede anular \'Bonanza\''),
-('Doble recompensa', 'Duplicar dinero obtenido.', 3, 'Se puedee usar en \'parada libre\', entre otros, no aplica en rentas.'),
-('Duelo', 'Ambos tiran los dados y el que pierde le paga 100$ al otro jugador.', 3, 'el jugador que usa la habilidad está con ventaja de de 3'),
-('Inmunidad a impuestos', 'No pagar impuestos, bonos por grupos de color, y cartas de fortuna y arca comunal.', 0, 'no incluye renta de casas y hoteles.'),
-('Movilidad', '+1 dado con 3 casillas en la jugada, se cuenta como dado adicional.', 3, 'Se puede usar con el dado veloz (dado rojo)'),
-('Policia', 'Poder encarcelar a un jugador o encarcelarse a si mismo.', 4, 'No pagar por salida de la carcel, cobrar mientras está en la carcel (en caso de aplicar)'),
-('Propiedades iniciales', '4 propiedades aleatorias gratis al comenzar.', 0, 'Se puede elegir una, pero se reduce el numero a 3 propiedades'),
-('Rentabilidad Aumentada.', 'Al momento de cobrar renta se cobra como con 3 casas.', 4, 'El numero de casas adicional es fijo, se puede robar y evadir por otros jugadores'),
-('Reposicionamiento', 'Mover el token a una casilla.', 5, 'Se debe realizar la acción de la misma (sin limites), no hay excepcion de casilla'),
-('Saqueador', 'Robar una transacción', 4, 'No aplica al pagar renta propia, en la compra de una propiedad el que la compró recibe su propiedad.'),
-('Señor de las cartas', 'Tomar carta y poder guardarla en secreto (max 2)', 2, 'Se puede dar a otro jugador.');
+INSERT INTO `pasivas` (`id`, `nombre`, `descripcion`, `enfriamiento`, `extras`) VALUES
+(1, 'Bonos', 'Obtener 100$.', 2, 'Puede se robado por otros jugadores1'),
+(2, 'Cambio de roles', 'Cambiar la posición del token con otro jugador.', 3, 'El otro jugador no realiza ninguna acción, no afecta en el primer turno para la salida'),
+(3, 'Compra ventajosa', 'Propiedades por mitad de precio', 0, 'Al ganar subasta tambíen se paga la mitad de lo establecido.'),
+(4, 'Constructor', 'Se obtiene un casa gratis', 3, 'Se activa al obtener un grupo de color, pero se pueden acumular 2, no incluye hoteles.'),
+(5, 'Dia de suerte', 'No pagar renta.', 5, 'Puede anular \'Bonanza\''),
+(6, 'Doble recompensa', 'Duplicar dinero obtenido.', 3, 'Se puedee usar en \'parada libre\', entre otros, no aplica en rentas.'),
+(7, 'Duelo', 'Ambos tiran los dados y el que pierde le paga 100$ al otro jugador.', 3, 'el jugador que usa la habilidad está con ventaja de de 3'),
+(8, 'Inmunidad a impuestos', 'No pagar impuestos, bonos por grupos de color, y cartas de fortuna y arca comunal.', 0, 'no incluye renta de casas y hoteles.'),
+(9, 'Movilidad', '+1 dado con 3 casillas en la jugada, se cuenta como dado adicional.', 3, 'Se puede usar con el dado veloz (dado rojo)'),
+(10, 'Policia', 'Poder encarcelar a un jugador o encarcelarse a si mismo.', 4, 'No pagar por salida de la carcel, cobrar mientras está en la carcel (en caso de aplicar)'),
+(11, 'Propiedades iniciales', '4 propiedades aleatorias gratis al comenzar.', 0, 'Se puede elegir una, pero se reduce el numero a 3 propiedades'),
+(12, 'Rentabilidad Aumentada.', 'Al momento de cobrar renta se cobra como con 3 casas.', 4, 'El numero de casas adicional es fijo, se puede robar y evadir por otros jugadores'),
+(13, 'Reposicionamiento', 'Mover el token a una casilla.', 5, 'Se debe realizar la acción de la misma (sin limites), no hay excepcion de casilla'),
+(14, 'Saqueador', 'Robar una transacción', 4, 'No aplica al pagar renta propia, en la compra de una propiedad el que la compró recibe su propiedad.'),
+(15, 'Señor de las cartas', 'Tomar carta y poder guardarla en secreto (max 2)', 2, 'Se puede dar a otro jugador.');
 
 -- --------------------------------------------------------
 
@@ -277,17 +323,17 @@ CREATE TABLE `propiedades` (
 --
 
 INSERT INTO `propiedades` (`id`, `nombre`, `color`, `precio`, `renta`, `renta_grupo`, `renta_1`, `renta_2`, `renta_3`, `renta_4`, `renta_5`, `costo_casa`, `hipoteca`, `costo_deshipoteca`, `dueño`, `hipotecado`, `nivel_renta`) VALUES
-(1, 'Avenida Mediterraneo', 'Marron', 60, 0, 0, 0, 0, 0, 0, 0, 50, 30, 33, NULL, 0, 1),
-(2, 'Avenida Baltica', 'Marron', 60, 0, 0, 0, 0, 0, 0, 0, 50, 30, 33, NULL, 0, 1),
-(3, 'Ferrocarril de Reading', 'Negro', 200, 0, 0, 0, 0, 0, 0, 0, NULL, 100, 110, NULL, 0, 1),
-(4, 'Avenida Oriental', 'Celeste', 100, 0, 0, 0, 0, 0, 0, 0, 50, 50, 55, NULL, 0, 1),
-(5, 'Avenida Vermont', 'Celeste', 100, 0, 0, 0, 0, 0, 0, 0, 50, 50, 55, NULL, 0, 1),
-(6, 'Avenida Connecticut', 'Celeste', 120, 0, 0, 0, 0, 0, 0, 0, 50, 60, 66, NULL, 0, 1),
-(7, 'Plaza San Carlos', 'Morado', 140, 0, 0, 0, 0, 0, 0, 0, 100, 70, 77, NULL, 0, 1),
-(8, 'Compañía de Electricidad', 'Servicio', 150, 0, 0, 0, 0, 0, 0, 0, NULL, 75, 83, NULL, 0, 1),
+(1, 'Avenida Mediterraneo', 'Marron', 60, 2, 0, 0, 0, 0, 0, 0, 50, 30, 33, 'polo', 0, 1),
+(2, 'Avenida Baltica', 'Marron', 60, 4, 0, 0, 0, 0, 0, 0, 50, 30, 33, 'polo', 0, 1),
+(3, 'Ferrocarril de Reading', 'Negro', 200, 6, 0, 0, 0, 0, 0, 0, NULL, 100, 110, 'polo', 0, 1),
+(4, 'Avenida Oriental', 'Celeste', 100, 6, 0, 0, 0, 0, 0, 0, 50, 50, 55, 'polo', 0, 1),
+(5, 'Avenida Vermont', 'Celeste', 100, 8, 0, 0, 0, 0, 0, 0, 50, 50, 55, 'gato', 0, 1),
+(6, 'Avenida Connecticut', 'Celeste', 120, 10, 0, 0, 0, 0, 0, 0, 50, 60, 66, 'gato', 0, 1),
+(7, 'Plaza San Carlos', 'Morado', 140, 10, 0, 0, 0, 0, 0, 0, 100, 70, 77, NULL, 0, 1),
+(8, 'Compañía de Electricidad', 'Servicio', 150, 1, 0, 0, 0, 0, 0, 0, NULL, 75, 83, 'polo', 0, 1),
 (9, 'Avenida Estados', 'Morado', 140, 0, 0, 0, 0, 0, 0, 0, 100, 70, 77, NULL, 0, 1),
 (10, 'Avenida Virginia', 'Morado', 160, 0, 0, 0, 0, 0, 0, 0, 100, 80, 88, NULL, 0, 1),
-(11, 'Ferrocarril Pensilvania', 'Negro', 200, 0, 0, 0, 0, 0, 0, 0, NULL, 100, 110, NULL, 0, 1),
+(11, 'Ferrocarril Pensilvania', 'Negro', 200, 0, 0, 0, 0, 0, 0, 0, NULL, 100, 110, 'polo', 0, 1),
 (12, 'Avenida San James', 'Naranja', 180, 0, 0, 0, 0, 0, 0, 0, 100, 90, 99, NULL, 0, 1),
 (13, 'Avenida Tennessee', 'Naranja', 180, 0, 0, 0, 0, 0, 0, 0, 100, 90, 99, NULL, 0, 1),
 (14, 'Avenida Nueva York', 'Naranja', 200, 0, 0, 0, 0, 0, 0, 0, 100, 100, 110, NULL, 0, 1),
@@ -313,26 +359,45 @@ INSERT INTO `propiedades` (`id`, `nombre`, `color`, `precio`, `renta`, `renta_gr
 --
 
 CREATE TABLE `variables` (
-  `parada_libre` int(6) NOT NULL DEFAULT 0
+  `impuestos_para_parada_libre` tinyint(1) NOT NULL DEFAULT 0,
+  `acomulado_parada_libre` int(5) DEFAULT NULL,
+  `dinero_inicio_personalizado` tinyint(1) NOT NULL DEFAULT 0,
+  `dinero_inicio` int(5) NOT NULL DEFAULT 1500,
+  `bono_salida` tinyint(1) NOT NULL DEFAULT 0,
+  `pasivas_activas` tinyint(1) NOT NULL DEFAULT 0,
+  `modo_exponencial` tinyint(1) NOT NULL DEFAULT 0,
+  `jugador_moderador` varchar(30) DEFAULT NULL,
+  `multiplicador_exponencial` int(4) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `variables`
 --
 
-INSERT INTO `variables` (`parada_libre`) VALUES
-(0);
+INSERT INTO `variables` (`impuestos_para_parada_libre`, `acomulado_parada_libre`, `dinero_inicio_personalizado`, `dinero_inicio`, `bono_salida`, `pasivas_activas`, `modo_exponencial`, `jugador_moderador`, `multiplicador_exponencial`) VALUES
+(0, 0, 0, 1500, 1, 0, 1, 'gato', 32);
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `version`
+--
+
+CREATE TABLE `version` (
+  `version` varchar(50) NOT NULL,
+  `txt` longtext DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `version`
+--
+
+INSERT INTO `version` (`version`, `txt`) VALUES
+('0.1', '-- phpMyAdmin SQL Dump\r\n-- version 5.2.1\r\n-- https://www.phpmyadmin.net/\r\n--\r\n-- Servidor: 127.0.0.1\r\n-- Tiempo de generación: 14-05-2023 a las 23:16:25\r\n-- Versión del servidor: 10.4.28-MariaDB\r\n-- Versión de PHP: 8.2.4\r\n\r\nSET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\r\nSTART TRANSACTION;\r\nSET time_zone = \"+00:00\";\r\n\r\n\r\n/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;\r\n/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;\r\n/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;\r\n/*!40101 SET NAMES utf8mb4 */;\r\n\r\n--\r\n-- Base de datos: `monopolios`\r\n--\r\n\r\nDELIMITER $$\r\n--\r\n-- Procedimientos\r\n--\r\nCREATE DEFINER=`root`@`localhost` PROCEDURE `Comprar_Casa` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN\r\n    UPDATE jugadores SET dinero = dinero - (SELECT costo_casa FROM propiedades WHERE nombre = Nombre_Propiedad) WHERE nombre = (SELECT dueño FROM propiedades WHERE nombre = Nombre_Propiedad);\r\n	UPDATE propiedades SET nivel_renta = nivel_renta + 1 WHERE nombre = Nombre_Propiedad;\r\n    INSERT INTO movimientos(ACCION) VALUES(CONCAT(Nombre_Propiedad, \' tiene una casa mas!\'));\r\n\r\nEND$$\r\n\r\nCREATE DEFINER=`admin`@`localhost` PROCEDURE `Comprar_Propiedad` (IN `nombre_jugador` VARCHAR(30), IN `vdinero_jugador` INT(6), IN `nombre_propiedad` VARCHAR(30), IN `vcosto_propiedad` INT(6))   BEGIN\r\n    IF vdinero_jugador >= vcosto_propiedad THEN\r\n        UPDATE propiedades SET dueño = nombre_jugador WHERE nombre = nombre_propiedad;\r\n        UPDATE jugadores SET dinero = dinero - vcosto_propiedad WHERE nombre = nombre_jugador;\r\n        INSERT INTO movimientos (accion) VALUES (concat(nombre_jugador, \' compró \', nombre_propiedad));\r\n    END IF;\r\nEND$$\r\n\r\nCREATE DEFINER=`root`@`localhost` PROCEDURE `Consultar_Dinero_Neto` (IN `Nombre_Jugador` VARCHAR(30))   SELECT (SELECT dinero FROM jugadores WHERE nombre COLLATE utf8mb4_general_ci = Nombre_Jugador COLLATE utf8mb4_general_ci) + \r\n(IFNULL((SELECT SUM(hipoteca) FROM propiedades WHERE dueño COLLATE utf8mb4_general_ci = Nombre_Jugador COLLATE utf8mb4_general_ci AND hipotecado = 0), 0))$$\r\n\r\nCREATE DEFINER=`admin`@`localhost` PROCEDURE `Crear_Jugador` (IN `vnombre` VARCHAR(30), IN `vpass` VARCHAR(50), IN `vdinero` INT(6), IN `vpasiva` VARCHAR(50))  COMMENT \'agregar un jugador y asignarle pasiva\' BEGIN\r\n    IF vnombre = \'\' OR vpass = \'\' THEN\r\n        SIGNAL SQLSTATE \'45000\' SET MESSAGE_TEXT = \'Nombre y contraseña son obligatorios\';\r\n    ELSE\r\n        IF vpasiva <> \'\' THEN\r\n            INSERT INTO jugadores (nombre, contraseña, dinero, pasiva, turnos_restantes) \r\n            VALUES (vnombre, vpass, vdinero, vpasiva, 0);\r\n            INSERT INTO movimientos (ACCION) \r\n            VALUES (CONCAT(vnombre, \' se unió, Dinero: $\', vdinero, \' Pasiva: \', vpasiva));\r\n        ELSE\r\n            INSERT INTO jugadores (nombre, contraseña, dinero, pasiva, turnos_restantes) \r\n            VALUES (vnombre, vpass, vdinero, vpasiva, 0);\r\n            INSERT INTO movimientos (ACCION) \r\n            VALUES (CONCAT(vnombre, \' se unió, Dinero: $\', vdinero));\r\n        END IF;\r\n    END IF;\r\nEND$$\r\n\r\nCREATE DEFINER=`admin`@`localhost` PROCEDURE `Hipotecar_Propiedad` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN\r\n    UPDATE propiedades SET hipotecado = 1 where nombre = Nombre_Propiedad;\r\n    UPDATE jugadores SET dinero = dinero + (SELECT hipoteca FROM propiedades WHERE nombre = Nombre_Propiedad);\r\n    INSERT INTO movimientos (accion) VALUES (CONCAT((SELECT dueño FROM propiedades WHERE nombre = Nombre_Propiedad), \' hipoteco \', Nombre_Propiedad));\r\nEND$$\r\n\r\nCREATE DEFINER=`admin`@`localhost` PROCEDURE `Nuevo_Juego` (IN `v_impuestos_para_parada_libre` BOOLEAN, IN `v_dinero_inicio_personaliazdo` BOOLEAN, IN `v_dinero_inicio` INT, IN `v_bono_salida` BOOLEAN, IN `v_pasivas_activas` BOOLEAN, IN `v_modo_exponencial` BOOLEAN, IN `v_jugador_moderador` VARCHAR(30))   BEGIN\r\n    TRUNCATE TABLE jugadores;\r\n    TRUNCATE TABLE MOVIMIENTOS;\r\n    SELECT \'Limpiadas tablas de jugadores y movimientos\' AS COMPLETADO;\r\n    INSERT INTO movimientos (accion) VALUES (\'Comienza el juego\'); \r\n    UPDATE propiedades SET dueño = NULL, hipotecado = 0, nivel_renta = 1;\r\n    UPDATE variables SET impuestos_para_parada_libre = v_impuestos_para_parada_libre, dinero_inicio_personalizado = v_dinero_inicio_personaliazdo, dinero_inicio = v_dinero_inicio, acomulado_parada_libre = 0, bono_salida = v_bono_salida, pasivas_activas = v_pasivas_activas, modo_exponencial = v_modo_exponencial, jugador_moderador = v_jugador_moderador, multiplicador_exponencial = 1;\r\nEND$$\r\n\r\nCREATE DEFINER=`root`@`localhost` PROCEDURE `Pagar_A_Banco` (IN `Nombre_Jugador` VARCHAR(30), IN `Monto_A_Pagar` INT(6))   BEGIN\r\n	UPDATE jugadores SET DINERO = DINERO - Monto_A_Pagar WHERE nombre = Nombre_Jugador;\r\n    INSERT INTO movimientos (accion) VALUES (CONCAT(Nombre_Jugador, \' pago \', Monto_A_Pagar, \' al banco\'));\r\nEND$$\r\n\r\nCREATE DEFINER=`admin`@`localhost` PROCEDURE `Pagar_A_Jugador` (IN `jugador1` VARCHAR(50), IN `jugador2` VARCHAR(50), IN `monto` INT(6))  COMMENT \'Función para pagar jugador A x monto a jugador B\' BEGIN\r\n    UPDATE jugadores SET DINERO = DINERO - monto WHERE nombre = jugador1;\r\n    UPDATE jugadores SET DINERO = DINERO + monto WHERE nombre = jugador2;\r\n    INSERT INTO movimientos (accion) VALUES (CONCAT(jugador1, \' pagó $\', monto, \' a \', jugador2));\r\nEND$$\r\n\r\nCREATE DEFINER=`root`@`localhost` PROCEDURE `Pagar_Carcel` (IN `Nombre_Jugador` VARCHAR(30))   BEGIN\r\n	UPDATE jugadores SET dinero = dinero - 50 WHERE nombre = Nombre_Jugador;\r\n    INSERT INTO movimientos (accion) VALUES (CONCAT(Nombre_Jugador, \' pago salida de carcel\')); \r\nEND$$\r\n\r\nCREATE DEFINER=`root`@`localhost` PROCEDURE `Pagar_impuestos` (IN `Nombre_Jugador` VARCHAR(30), IN `Monto_A_Pagar` INT(6), IN `Impuestos_Para_Parada_Libre` BOOLEAN)   BEGIN\r\n	IF Impuestos_Para_Parada_libre = 1 THEN\r\n        UPDATE jugadores SET dinero = dinero - Monto_A_Pagar where nombre = Nombre_Jugador;\r\n        UPDATE variables SET acomiulado_parada_libre = acomulado_parada_libre + Monto_A_Pagar;\r\n        INSERT INTO movimientos (accion) VALUES (CONCAT(Nombre_Jugador, \' sumó \', Monto_A_Pagar, \' a parada libre\'));\r\n        INSERT INTO movimientos (accion) VALUES (CONCAT(\'Premio parada libre: \', (SELECT parada_libre FROM variables)));\r\n    ELSE\r\n        UPDATE jugadores SET dinero = dinero - Monto_A_Pagar where nombre = Nombre_Jugador;\r\n        INSERT INTO movimientos (accion) VALUES (CONCAT(Nombre_Jugador, \' pagó \', Monto_A_Pagar, \' de impuestos\'));\r\n    END IF;\r\nEND$$\r\n\r\nCREATE DEFINER=`root`@`localhost` PROCEDURE `Pago_A_Banco` (IN `nombre_jugador` VARCHAR(30), IN `monto_a_pagar` INT(6), IN `razón` VARCHAR(30))   BEGIN\r\n    IF razon = \'carcel\' THEN\r\n        UPDATE jugadores SET dinero = dinero - 50 where nombre = nombre_jugador;\r\n        INSERT INTO movimientos (accion) VALUES (CONCAT(nombre_jugador, \' pagó salida de la carcel\'));\r\n    ELSE\r\n        UPDATE jugadores SET dinero = dinero - monto_a_pagar where nombre = nombre_jugador;\r\n        INSERT INTO movimientos (accion) VALUES (CONCAT(nombre_jugador, \' pagó al banco \', monto_a_pagar, \' por \', razon));\r\n    END IF;\r\nEND$$\r\n\r\nCREATE DEFINER=`root`@`localhost` PROCEDURE `Recibir_Dinero_Banco` (IN `v1` VARCHAR(30), IN `v2` INT(6), IN `v3` VARCHAR(20))   BEGIN\r\n    UPDATE jugadores SET dinero = dinero + v2 WHERE nombre = v1;\r\n    INSERT INTO movimientos (accion) VALUES (CONCAT(v1, \' recibio \', v2, \' del banco  por \', v3));\r\nEND$$\r\n\r\nCREATE DEFINER=`root`@`localhost` PROCEDURE `Recibir_Dinero_Vuelta` (IN `nombre_jugador` VARCHAR(30))   BEGIN\r\n	IF (SELECT modo_exponencial FROM variables) = 0 THEN\r\n	    UPDATE jugadores SET dinero = dinero + 200 WHERE nombre = nombre_jugador;\r\n    	INSERT INTO movimientos (accion) VALUES (CONCAT(nombre_jugador, \' recibio $200 por dar una vuelta!\'));\r\n    ELSE\r\n	    UPDATE jugadores SET dinero = dinero + 200 WHERE nombre = nombre_jugador;\r\n    	INSERT INTO movimientos (accion) VALUES (CONCAT(nombre_jugador, \' recibio $200 por dar una vuelta!\'));\r\n    	IF (SELECT JUGADOR_MODERADOR FROM VARIABLES) = nombre_jugador THEN\r\n	    	UPDATE VARIABLES SET multiplicador_exponencial = multiplicador_exponencial * 2;\r\n    		INSERT INTO movimientos (accion) VALUES (CONCAT(\'Rentas ahora son x\', (SELECT multiplicador_exponencial FROM variables)));\r\n        END IF;\r\n    END IF;\r\nEND$$\r\n\r\nCREATE DEFINER=`root`@`localhost` PROCEDURE `Recibir_Dinero_Vuelta_Doble` (IN `Nombre_Jugador` VARCHAR(30))   BEGIN \r\n    UPDATE jugadores SET dinero = dinero + 400 WHERE nombre = Nombre_Jugador;\r\n    INSERT INTO MOVIMIENTOS(ACCION) VALUES(CONCAT(Nombre_Jugador, \' recibio $400 por vuelta doble!\'));\r\nEND$$\r\n\r\nCREATE DEFINER=`admin`@`localhost` PROCEDURE `Rendirse_Abandono` (IN `Nombre_Jugador` VARCHAR(30))   BEGIN\r\n    UPDATE propiedades SET dueño = NULL where dueño = Nombre_Jugador;\r\n    UPDATE jugadores SET dinero = 0, activo = 0 where nombre = Nombre_Jugador;\r\n    INSERT INTO movimientos (accion) VALUES (CONCAT(Nombre_Jugador, \' se rindió y todo su dinero y propiedades pasan a ser del banco\')); \r\nEND$$\r\n\r\nCREATE DEFINER=`admin`@`localhost` PROCEDURE `Rendirse_Compartir` (IN `Nombre_Jugador` VARCHAR(30))   BEGIN\r\n\r\nSET NAMES \'utf8mb4\';\r\nSET @Nombre_Jugador = Nombre_Jugador;\r\nSET @Dinero_Jugador = (SELECT dinero FROM jugadores WHERE nombre COLLATE utf8mb4_general_ci = @Nombre_Jugador COLLATE utf8mb4_general_ci);\r\nSET @Dinero_Propiedades = IFNULL((SELECT SUM(hipoteca) FROM propiedades WHERE dueño COLLATE utf8mb4_general_ci = @Nombre_Jugador COLLATE utf8mb4_general_ci), 0);\r\nSET @Dinero_Neto = @Dinero_Jugador + @Dinero_Propiedades;\r\nSET @Numero_Jugadores_Activos = (SELECT count(*) - 1 FROM jugadores WHERE activo COLLATE latin1_general_ci = 1 COLLATE latin1_general_ci);\r\nSET @Dinero_Para_Jugadores = FLOOR(@Dinero_Neto / @Numero_Jugadores_Activos);\r\n#SELECT @Nombre_Jugador, @Dinero_Para_Jugadores;\r\n\r\n\r\n	UPDATE jugadores set activo = 0 WHERE nombre = @Nombre_Jugador;\r\n	INSERT INTO movimientos (accion) VALUES (CONCAT(Nombre_Jugador, \' se rindio, compartiendo \', @Dinero_Para_Jugadores, \' a todos los jugadores\'));\r\n	UPDATE jugadores SET dinero = dinero + @Dinero_Para_Jugadores WHERE activo = 1;\r\n	UPDATE jugadores SET dinero = 0 WHERE nombre = Nombre_Jugador;\r\n	UPDATE propiedades SET dueño = NULL, hipotecado = 0 WHERE dueño = Nombre_Jugador;\r\n\r\nEND$$\r\n\r\nCREATE DEFINER=`admin`@`localhost` PROCEDURE `Tirar_Dado` (IN `jugador` VARCHAR(50))  COMMENT \'restar 1 al enfriamiento de la habilidad del jugador\' BEGIN\r\n    IF ((SELECT turnos_restantes FROM jugadores WHERE nombre = jugador) > 0) THEN\r\n        UPDATE jugadores SET turnos_restantes = turnos_restantes - 1 WHERE nombre = jugador;\r\n        INSERT INTO movimientos (ACCION) VALUES(CONCAT(JUGADOR, \' tiró los dados, \', (SELECT turnos_restantes FROM jugadores where nombre = jugador) ,\' turnos restantes\'));\r\n    ELSE\r\n        INSERT INTO movimientos (ACCION) VALUES(CONCAT(JUGADOR, \' tiró los dados, \', (SELECT turnos_restantes FROM jugadores where nombre = jugador) ,\' turnos restantes\'));\r\n    END IF;\r\nEND$$\r\n\r\nCREATE DEFINER=`admin`@`localhost` PROCEDURE `Usar_Pasiva` (IN `jugador` VARCHAR(50))   BEGIN\r\n  IF (SELECT turnos_restantes FROM jugadores WHERE nombre = jugador) = 0 THEN\r\n    UPDATE jugadores SET turnos_restantes = (SELECT pasivas.enfriamiento FROM pasivas INNER JOIN jugadores ON pasivas.nombre = jugadores.pasiva WHERE jugadores.nombre = jugador) WHERE nombre = jugador;\r\n    INSERT INTO movimientos (ACCION) VALUES (CONCAT(jugador, \' usó \', (SELECT pasiva FROM jugadores WHERE nombre = jugador)));\r\n  END IF;\r\nEND$$\r\n\r\nCREATE DEFINER=`admin`@`localhost` PROCEDURE `validar_usuario` (IN `vnombre` VARCHAR(30), IN `vpass` VARCHAR(50))   SELECT count(*) FROM jugadores where nombre = vnombre AND contraseña = vpass$$\r\n\r\nCREATE DEFINER=`root`@`localhost` PROCEDURE `Vender_Casa` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN\r\n    UPDATE jugadores SET dinero = dinero + (SELECT costo_casa / 2 FROM propiedades WHERE nombre = Nombre_Propiedad) WHERE nombre = (SELECT dueño FROM propiedades WHERE nombre = Nombre_Propiedad);\r\n	UPDATE propiedades SET nivel_renta = nivel_renta - 1 WHERE nombre = Nombre_Propiedad;\r\n    INSERT INTO movimientos(ACCION) VALUES(CONCAT(Nombre_Propiedad, \' tiene una casa menos!\'));\r\n\r\nEND$$\r\n\r\nDELIMITER ;\r\n\r\n-- --------------------------------------------------------\r\n\r\n--\r\n-- Estructura de tabla para la tabla `jugadores`\r\n--\r\n\r\nCREATE TABLE `jugadores` (\r\n  `nombre` varchar(30) NOT NULL,\r\n  `contraseña` varchar(50) NOT NULL,\r\n  `dinero` int(11) NOT NULL,\r\n  `pasiva` varchar(50) DEFAULT NULL,\r\n  `turnos_restantes` int(2) DEFAULT NULL,\r\n  `activo` tinyint(1) NOT NULL DEFAULT 1\r\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;\r\n\r\n--\r\n-- Volcado de datos para la tabla `jugadores`\r\n--\r\n\r\nINSERT INTO `jugadores` (`nombre`, `contraseña`, `dinero`, `pasiva`, `turnos_restantes`, `activo`) VALUES\r\n(\'gato\', \'gato\', 1364, NULL, 0, 1),\r\n(\'polo\', \'gato\', 1196, NULL, 0, 1);\r\n\r\n-- --------------------------------------------------------\r\n\r\n--\r\n-- Estructura de tabla para la tabla `movimientos`\r\n--\r\n\r\nCREATE TABLE `movimientos` (\r\n  `id` int(11) NOT NULL,\r\n  `accion` varchar(100) NOT NULL,\r\n  `tiempo` datetime NOT NULL DEFAULT current_timestamp()\r\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;\r\n\r\n--\r\n-- Volcado de datos para la tabla `movimientos`\r\n--\r\n\r\nINSERT INTO `movimientos` (`id`, `accion`, `tiempo`) VALUES\r\n(1, \'Comienza el juego\', \'2023-05-14 14:07:37\'),\r\n(2, \'gato se unió, Dinero: $1500\', \'2023-05-14 14:07:37\'),\r\n(3, \'polo se unió, Dinero: $1500\', \'2023-05-14 14:07:45\'),\r\n(4, \'Rentas ahora son x2\', \'2023-05-14 14:07:55\'),\r\n(5, \'Rentas ahora son x4\', \'2023-05-14 14:09:22\'),\r\n(6, \'Rentas ahora son x8\', \'2023-05-14 14:10:03\'),\r\n(7, \'Rentas ahora son x16\', \'2023-05-14 14:15:15\'),\r\n(8, \'polo recibio $200 por dar una vuelta!\', \'2023-05-14 14:16:22\'),\r\n(9, \'polo recibio $200 por dar una vuelta!\', \'2023-05-14 14:16:25\'),\r\n(10, \'gato recibio $200 por dar una vuelta!\', \'2023-05-14 14:16:31\'),\r\n(11, \'Rentas ahora son x32\', \'2023-05-14 14:16:31\'),\r\n(12, \'polo compró Avenida Mediterraneo dinero: 1840\', \'2023-05-14 14:27:02\'),\r\n(13, \'polo compró Avenida Baltica dinero: 1780\', \'2023-05-14 14:27:04\'),\r\n(14, \'polo compró Ferrocarril de Reading dinero: 1580\', \'2023-05-14 14:27:06\'),\r\n(15, \'polo compró Avenida Oriental dinero: 1480\', \'2023-05-14 14:27:22\'),\r\n(16, \'polo compró Compañía de Electricidad dinero: 1330\', \'2023-05-14 14:27:27\'),\r\n(17, \'gato pagó $2 a polo\', \'2023-05-14 14:59:02\'),\r\n(18, \'gato pagó $64 a polo\', \'2023-05-14 15:00:48\'),\r\n(19, \'polo compró Ferrocarril Pensilvania dinero: 1196\', \'2023-05-14 15:03:20\'),\r\n(20, \'gato compró Avenida Vermont dinero: 1534\', \'2023-05-14 15:04:20\'),\r\n(21, \'Avenida Vermont tiene una casa mas!\', \'2023-05-14 15:04:24\'),\r\n(22, \'Avenida Vermont tiene una casa mas!\', \'2023-05-14 15:04:27\'),\r\n(23, \'gato compró Avenida Connecticut\', \'2023-05-14 15:04:59\'),\r\n(24, \'Avenida Vermont tiene una casa menos!\', \'2023-05-14 15:05:18\'),\r\n(25, \'Avenida Vermont tiene una casa menos!\', \'2023-05-14 15:05:20\');\r\n\r\n-- --------------------------------------------------------\r\n\r\n--\r\n-- Estructura de tabla para la tabla `pasivas`\r\n--\r\n\r\nCREATE TABLE `pasivas` (\r\n  `id` int(2) NOT NULL,\r\n  `nombre` varchar(50) NOT NULL,\r\n  `descripcion` varchar(100) NOT NULL,\r\n  `enfriamiento` int(2) NOT NULL,\r\n  `extras` varchar(100) NOT NULL\r\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;\r\n\r\n--\r\n-- Volcado de datos para la tabla `pasivas`\r\n--\r\n\r\nINSERT INTO `pasivas` (`id`, `nombre`, `descripcion`, `enfriamiento`, `extras`) VALUES\r\n(1, \'Bonos\', \'Obtener 100$.\', 2, \'Puede se robado por otros jugadores1\'),\r\n(2, \'Cambio de roles\', \'Cambiar la posición del token con otro jugador.\', 3, \'El otro jugador no realiza ninguna acción, no afecta en el primer turno para la salida\'),\r\n(3, \'Compra ventajosa\', \'Propiedades por mitad de precio\', 0, \'Al ganar subasta tambíen se paga la mitad de lo establecido.\'),\r\n(4, \'Constructor\', \'Se obtiene un casa gratis\', 3, \'Se activa al obtener un grupo de color, pero se pueden acumular 2, no incluye hoteles.\'),\r\n(5, \'Dia de suerte\', \'No pagar renta.\', 5, \'Puede anular \\\'Bonanza\\\'\'),\r\n(6, \'Doble recompensa\', \'Duplicar dinero obtenido.\', 3, \'Se puedee usar en \\\'parada libre\\\', entre otros, no aplica en rentas.\'),\r\n(7, \'Duelo\', \'Ambos tiran los dados y el que pierde le paga 100$ al otro jugador.\', 3, \'el jugador que usa la habilidad está con ventaja de de 3\'),\r\n(8, \'Inmunidad a impuestos\', \'No pagar impuestos, bonos por grupos de color, y cartas de fortuna y arca comunal.\', 0, \'no incluye renta de casas y hoteles.\'),\r\n(9, \'Movilidad\', \'+1 dado con 3 casillas en la jugada, se cuenta como dado adicional.\', 3, \'Se puede usar con el dado veloz (dado rojo)\'),\r\n(10, \'Policia\', \'Poder encarcelar a un jugador o encarcelarse a si mismo.\', 4, \'No pagar por salida de la carcel, cobrar mientras está en la carcel (en caso de aplicar)\'),\r\n(11, \'Propiedades iniciales\', \'4 propiedades aleatorias gratis al comenzar.\', 0, \'Se puede elegir una, pero se reduce el numero a 3 propiedades\'),\r\n(12, \'Rentabilidad Aumentada.\', \'Al momento de cobrar renta se cobra como con 3 casas.\', 4, \'El numero de casas adicional es fijo, se puede robar y evadir por otros jugadores\'),\r\n(13, \'Reposicionamiento\', \'Mover el token a una casilla.\', 5, \'Se debe realizar la acción de la misma (sin limites), no hay excepcion de casilla\'),\r\n(14, \'Saqueador\', \'Robar una transacción\', 4, \'No aplica al pagar renta propia, en la compra de una propiedad el que la compró recibe su propiedad.\'),\r\n(15, \'Señor de las cartas\', \'Tomar carta y poder guardarla en secreto (max 2)\', 2, \'Se puede dar a otro jugador.\');\r\n\r\n-- --------------------------------------------------------\r\n\r\n--\r\n-- Estructura de tabla para la tabla `propiedades`\r\n--\r\n\r\nCREATE TABLE `propiedades` (\r\n  `id` int(11) NOT NULL,\r\n  `nombre` varchar(30) NOT NULL,\r\n  `color` varchar(20) NOT NULL,\r\n  `precio` int(6) NOT NULL,\r\n  `renta` int(4) NOT NULL,\r\n  `renta_grupo` int(4) NOT NULL,\r\n  `renta_1` int(4) NOT NULL,\r\n  `renta_2` int(4) NOT NULL,\r\n  `renta_3` int(4) NOT NULL,\r\n  `renta_4` int(4) NOT NULL,\r\n  `renta_5` int(4) NOT NULL,\r\n  `costo_casa` int(6) DEFAULT NULL,\r\n  `hipoteca` int(6) NOT NULL,\r\n  `costo_deshipoteca` int(6) NOT NULL,\r\n  `dueño` varchar(30) DEFAULT NULL,\r\n  `hipotecado` tinyint(1) NOT NULL DEFAULT 0,\r\n  `nivel_renta` int(1) NOT NULL DEFAULT 1\r\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;\r\n\r\n--\r\n-- Volcado de datos para la tabla `propiedades`\r\n--\r\n\r\nINSERT INTO `propiedades` (`id`, `nombre`, `color`, `precio`, `renta`, `renta_grupo`, `renta_1`, `renta_2`, `renta_3`, `renta_4`, `renta_5`, `costo_casa`, `hipoteca`, `costo_deshipoteca`, `dueño`, `hipotecado`, `nivel_renta`) VALUES\r\n(1, \'Avenida Mediterraneo\', \'Marron\', 60, 2, 0, 0, 0, 0, 0, 0, 50, 30, 33, \'polo\', 0, 1),\r\n(2, \'Avenida Baltica\', \'Marron\', 60, 4, 0, 0, 0, 0, 0, 0, 50, 30, 33, \'polo\', 0, 1),\r\n(3, \'Ferrocarril de Reading\', \'Negro\', 200, 6, 0, 0, 0, 0, 0, 0, NULL, 100, 110, \'polo\', 0, 1),\r\n(4, \'Avenida Oriental\', \'Celeste\', 100, 6, 0, 0, 0, 0, 0, 0, 50, 50, 55, \'polo\', 0, 1),\r\n(5, \'Avenida Vermont\', \'Celeste\', 100, 8, 0, 0, 0, 0, 0, 0, 50, 50, 55, \'gato\', 0, 1),\r\n(6, \'Avenida Connecticut\', \'Celeste\', 120, 10, 0, 0, 0, 0, 0, 0, 50, 60, 66, \'gato\', 0, 1),\r\n(7, \'Plaza San Carlos\', \'Morado\', 140, 10, 0, 0, 0, 0, 0, 0, 100, 70, 77, NULL, 0, 1),\r\n(8, \'Compañía de Electricidad\', \'Servicio\', 150, 1, 0, 0, 0, 0, 0, 0, NULL, 75, 83, \'polo\', 0, 1),\r\n(9, \'Avenida Estados\', \'Morado\', 140, 0, 0, 0, 0, 0, 0, 0, 100, 70, 77, NULL, 0, 1),\r\n(10, \'Avenida Virginia\', \'Morado\', 160, 0, 0, 0, 0, 0, 0, 0, 100, 80, 88, NULL, 0, 1),\r\n(11, \'Ferrocarril Pensilvania\', \'Negro\', 200, 0, 0, 0, 0, 0, 0, 0, NULL, 100, 110, \'polo\', 0, 1),\r\n(12, \'Avenida San James\', \'Naranja\', 180, 0, 0, 0, 0, 0, 0, 0, 100, 90, 99, NULL, 0, 1),\r\n(13, \'Avenida Tennessee\', \'Naranja\', 180, 0, 0, 0, 0, 0, 0, 0, 100, 90, 99, NULL, 0, 1),\r\n(14, \'Avenida Nueva York\', \'Naranja\', 200, 0, 0, 0, 0, 0, 0, 0, 100, 100, 110, NULL, 0, 1),\r\n(15, \'Avenida Kentucky\', \'Rojo\', 220, 0, 0, 0, 0, 0, 0, 0, 150, 110, 110, NULL, 0, 1),\r\n(16, \'Avenida Indiana\', \'Rojo\', 220, 0, 0, 0, 0, 0, 0, 0, 150, 110, 110, NULL, 0, 1),\r\n(17, \'Avenida Illinois\', \'Rojo\', 240, 0, 0, 0, 0, 0, 0, 0, 150, 120, 142, NULL, 0, 1),\r\n(18, \'Ferrocarril B&O\', \'Negro\', 200, 0, 0, 0, 0, 0, 0, 0, NULL, 100, 110, NULL, 0, 1),\r\n(19, \'Avenida Atlantico\', \'Amarillo\', 260, 0, 0, 0, 0, 0, 0, 0, 150, 130, 143, NULL, 0, 1),\r\n(20, \'Avenida Ventnor\', \'Amarillo\', 260, 0, 0, 0, 0, 0, 0, 0, 150, 130, 143, NULL, 0, 1),\r\n(21, \'Compañía de Agua\', \'Servicio\', 150, 0, 0, 0, 0, 0, 0, 0, NULL, 75, 83, NULL, 0, 1),\r\n(22, \'Jardines Marvin\', \'Amarillo\', 280, 0, 0, 0, 0, 0, 0, 0, 150, 140, 154, NULL, 0, 1),\r\n(23, \'Avenida Pacifico\', \'Verde\', 300, 0, 0, 0, 0, 0, 0, 0, 200, 150, 165, NULL, 0, 1),\r\n(24, \'Avenida Carolina del Norte\', \'Verde\', 300, 0, 0, 0, 0, 0, 0, 0, 200, 150, 165, NULL, 0, 1),\r\n(25, \'Avenida Pensilvania\', \'Verde\', 320, 0, 0, 0, 0, 0, 0, 0, 200, 160, 175, NULL, 0, 1),\r\n(26, \'Ferrocarril Via Rápida\', \'Negro\', 200, 0, 0, 0, 0, 0, 0, 0, NULL, 100, 110, NULL, 0, 1),\r\n(27, \'Plaza Park\', \'Azul\', 350, 0, 0, 0, 0, 0, 0, 0, 200, 175, 193, NULL, 0, 1),\r\n(28, \'El Muelle\', \'Azul\', 400, 0, 0, 0, 0, 0, 0, 0, 200, 200, 220, NULL, 0, 1);\r\n\r\n-- --------------------------------------------------------\r\n\r\n--\r\n-- Estructura de tabla para la tabla `variables`\r\n--\r\n\r\nCREATE TABLE `variables` (\r\n  `impuestos_para_parada_libre` tinyint(1) NOT NULL DEFAULT 0,\r\n  `acomulado_parada_libre` int(5) DEFAULT NULL,\r\n  `dinero_inicio_personalizado` tinyint(1) NOT NULL DEFAULT 0,\r\n  `dinero_inicio` int(5) NOT NULL DEFAULT 1500,\r\n  `bono_salida` tinyint(1) NOT NULL DEFAULT 0,\r\n  `pasivas_activas` tinyint(1) NOT NULL DEFAULT 0,\r\n  `modo_exponencial` tinyint(1) NOT NULL DEFAULT 0,\r\n  `jugador_moderador` varchar(30) DEFAULT NULL,\r\n  `multiplicador_exponencial` int(4) NOT NULL DEFAULT 1\r\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;\r\n\r\n--\r\n-- Volcado de datos para la tabla `variables`\r\n--\r\n\r\nINSERT INTO `variables` (`impuestos_para_parada_libre`, `acomulado_parada_libre`, `dinero_inicio_personalizado`, `dinero_inicio`, `bono_salida`, `pasivas_activas`, `modo_exponencial`, `jugador_moderador`, `multiplicador_exponencial`) VALUES\r\n(0, 0, 0, 1500, 1, 0, 1, \'gato\', 32);\r\n\r\n-- --------------------------------------------------------\r\n\r\n--\r\n-- Estructura de tabla para la tabla `version`\r\n--\r\n\r\nCREATE TABLE `version` (\r\n  `txt` varchar(10000) DEFAULT NULL\r\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;\r\n\r\n--\r\n-- Índices para tablas volcadas\r\n--\r\n\r\n--\r\n-- Indices de la tabla `movimientos`\r\n--\r\nALTER TABLE `movimientos`\r\n  ADD PRIMARY KEY (`id`);\r\n\r\n--\r\n-- Indices de la tabla `pasivas`\r\n--\r\nALTER TABLE `pasivas`\r\n  ADD PRIMARY KEY (`id`);\r\n\r\n--\r\n-- Indices de la tabla `propiedades`\r\n--\r\nALTER TABLE `propiedades`\r\n  ADD PRIMARY KEY (`id`);\r\n\r\n--\r\n-- AUTO_INCREMENT de las tablas volcadas\r\n--\r\n\r\n--\r\n-- AUTO_INCREMENT de la tabla `movimientos`\r\n--\r\nALTER TABLE `movimientos`\r\n  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;\r\n\r\n--\r\n-- AUTO_INCREMENT de la tabla `pasivas`\r\n--\r\nALTER TABLE `pasivas`\r\n  MODIFY `id` int(2) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;\r\n\r\n--\r\n-- AUTO_INCREMENT de la tabla `propiedades`\r\n--\r\nALTER TABLE `propiedades`\r\n  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;\r\nCOMMIT;\r\n\r\n/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;\r\n/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;\r\n/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;\r\n');
 
 --
 -- Índices para tablas volcadas
 --
-
---
--- Indices de la tabla `jugadores`
---
-ALTER TABLE `jugadores`
-  ADD PRIMARY KEY (`nombre`),
-  ADD KEY `pasiva` (`pasiva`);
 
 --
 -- Indices de la tabla `movimientos`
@@ -344,7 +409,7 @@ ALTER TABLE `movimientos`
 -- Indices de la tabla `pasivas`
 --
 ALTER TABLE `pasivas`
-  ADD PRIMARY KEY (`nombre`);
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Indices de la tabla `propiedades`
@@ -360,7 +425,13 @@ ALTER TABLE `propiedades`
 -- AUTO_INCREMENT de la tabla `movimientos`
 --
 ALTER TABLE `movimientos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
+
+--
+-- AUTO_INCREMENT de la tabla `pasivas`
+--
+ALTER TABLE `pasivas`
+  MODIFY `id` int(2) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT de la tabla `propiedades`
