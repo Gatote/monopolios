@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 18-05-2023 a las 05:16:19
+-- Tiempo de generación: 18-05-2023 a las 21:44:41
 -- Versión del servidor: 10.4.28-MariaDB
 -- Versión de PHP: 8.2.4
 
@@ -25,6 +25,16 @@ DELIMITER $$
 --
 -- Procedimientos
 --
+CREATE DEFINER=`admin`@`localhost` PROCEDURE `Casa_Disponible` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN
+    set @nombre_propiedad = Nombre_Propiedad;
+    set @color_propiedad = (select color from propiedades WHERE nombre = @nombre_propiedad COLLATE utf8mb4_general_ci);
+    set @nivel_propiedad = (select nivel_renta from propiedades WHERE nombre = @nombre_propiedad COLLATE utf8mb4_general_ci);
+    set @nivel_maximo = (select max(nivel_renta) from propiedades WHERE color = @color_propiedad COLLATE utf8mb4_general_ci);
+    set @promedio = (SELECT sum(nivel_renta)/count(*) from propiedades where color = @color_propiedad);
+    set @mismo_nivel = (SELECT if (@promedio = @nivel_maximo, 1,0));
+    SELECT if ((@nivel_propiedad < @nivel_maximo) or @mismo_nivel ,1,0) as Disponible;
+END$$
+
 CREATE DEFINER=`admin`@`localhost` PROCEDURE `Cobrar_Parada_Libre` (IN `Nombre_Jugador` VARCHAR(30))   BEGIN
 	SET @dinero_parada_libre = (SELECT ACOMULADO_PARADA_LIBRE FROM VARIABLES);
 	IF (SELECT IMPUESTOS_PARA_PARADA_LIBRE FROM variables) = 1 THEN
@@ -38,7 +48,7 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `Comprar_Casa` (IN `Nombre_Propiedad
     SET @es_ferrocarril_o_servicio = (SELECT IF(color = 'servicio' OR color = 'negro', 1, 0) from propiedades where nombre = nombre_propiedad);
     SET @numero_casas = (SELECT NIVEL_RENTA FROM propiedades WHERE nombre = Nombre_Propiedad);
     IF NOT @es_ferrocarril_o_servicio THEN
-    	IF @numero_casas BETWEEN 2 AND 5 then
+    	IF @numero_casas BETWEEN 2 AND 6 then
         
         
         
@@ -324,6 +334,13 @@ CREATE TABLE `jugadores` (
   `activo` tinyint(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Volcado de datos para la tabla `jugadores`
+--
+
+INSERT INTO `jugadores` (`nombre`, `contraseña`, `dinero`, `pasiva`, `turnos_restantes`, `activo`) VALUES
+('gato', 'gato', 705, NULL, 0, 1);
+
 -- --------------------------------------------------------
 
 --
@@ -341,7 +358,38 @@ CREATE TABLE `movimientos` (
 --
 
 INSERT INTO `movimientos` (`id`, `accion`, `tiempo`) VALUES
-(1, 'Comienza el juego', '2023-05-17 21:05:38');
+(1, 'Comienza el juego', '2023-05-17 21:05:38'),
+(2, 'gato se unió, Dinero: $1500', '2023-05-18 11:26:17'),
+(3, 'gato pagó $100 de impuestos', '2023-05-18 11:35:05'),
+(4, 'gato compró Avenida Mediterraneo', '2023-05-18 11:45:33'),
+(5, 'gato compró Avenida Baltica', '2023-05-18 11:45:35'),
+(6, 'gato hizo el grupo de color Marron!', '2023-05-18 11:45:37'),
+(7, 'Avenida Mediterraneo tiene una casa mas!', '2023-05-18 11:47:47'),
+(8, 'Avenida Mediterraneo tiene una casa mas!', '2023-05-18 12:23:28'),
+(9, 'Avenida Mediterraneo tiene una casa mas!', '2023-05-18 12:23:42'),
+(10, 'Avenida Mediterraneo tiene una casa mas!', '2023-05-18 12:23:47'),
+(11, 'Avenida Baltica tiene una casa mas!', '2023-05-18 12:23:57'),
+(12, 'Avenida Baltica tiene una casa mas!', '2023-05-18 12:23:59'),
+(13, 'Avenida Baltica tiene una casa mas!', '2023-05-18 12:24:01'),
+(14, 'Avenida Mediterraneo tiene una casa menos!', '2023-05-18 12:25:29'),
+(15, 'Avenida Mediterraneo tiene una casa menos!', '2023-05-18 12:25:29'),
+(16, 'Avenida Mediterraneo tiene una casa menos!', '2023-05-18 12:25:29'),
+(17, 'Avenida Mediterraneo tiene una casa menos!', '2023-05-18 12:25:29'),
+(18, 'Avenida Mediterraneo tiene una casa menos!', '2023-05-18 12:25:29'),
+(19, 'Avenida Baltica tiene una casa menos!', '2023-05-18 12:25:33'),
+(20, 'Avenida Baltica tiene una casa menos!', '2023-05-18 12:25:33'),
+(21, 'Avenida Baltica tiene una casa menos!', '2023-05-18 12:25:34'),
+(22, 'Avenida Baltica tiene una casa menos!', '2023-05-18 12:25:34'),
+(23, 'gato hizo el grupo de color Marron!', '2023-05-18 12:25:55'),
+(24, 'Avenida Baltica tiene una casa mas!', '2023-05-18 12:26:15'),
+(25, 'Avenida Baltica tiene una casa mas!', '2023-05-18 12:26:28'),
+(26, 'Avenida Baltica tiene una casa mas!', '2023-05-18 12:58:39'),
+(27, 'Avenida Mediterraneo tiene una casa mas!', '2023-05-18 12:58:45'),
+(28, 'Avenida Baltica tiene una casa mas!', '2023-05-18 13:05:08'),
+(29, 'Avenida Mediterraneo tiene una casa mas!', '2023-05-18 13:05:13'),
+(30, 'Avenida Baltica tiene una casa mas!', '2023-05-18 13:05:59'),
+(31, 'Avenida Baltica tiene una casa mas!', '2023-05-18 13:06:42'),
+(32, 'Avenida Mediterraneo tiene una casa mas!', '2023-05-18 13:06:46');
 
 -- --------------------------------------------------------
 
@@ -409,8 +457,8 @@ CREATE TABLE `propiedades` (
 --
 
 INSERT INTO `propiedades` (`id`, `nombre`, `color`, `precio`, `renta`, `renta_grupo`, `renta_1`, `renta_2`, `renta_3`, `renta_4`, `renta_5`, `costo_casa`, `hipoteca`, `costo_deshipoteca`, `dueño`, `hipotecado`, `nivel_renta`) VALUES
-(1, 'Avenida Mediterraneo', 'Marron', 60, 2, 4, 10, 30, 90, 160, 250, 50, 30, 33, NULL, 0, 1),
-(2, 'Avenida Baltica', 'Marron', 60, 4, 8, 20, 60, 180, 320, 450, 50, 30, 33, NULL, 0, 1),
+(1, 'Avenida Mediterraneo', 'Marron', 60, 2, 4, 10, 30, 90, 160, 250, 50, 30, 33, 'gato', 0, 7),
+(2, 'Avenida Baltica', 'Marron', 60, 4, 8, 20, 60, 180, 320, 450, 50, 30, 33, 'gato', 0, 7),
 (3, 'Ferrocarril de Reading', 'Negro', 200, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 100, 110, NULL, 0, 1),
 (4, 'Avenida Oriental', 'Celeste', 100, 6, 12, 30, 90, 270, 400, 550, 50, 50, 55, NULL, 0, 1),
 (5, 'Avenida Vermont', 'Celeste', 100, 6, 12, 30, 90, 270, 0, 550, 50, 50, 55, NULL, 0, 1),
@@ -512,7 +560,7 @@ ALTER TABLE `propiedades`
 -- AUTO_INCREMENT de la tabla `movimientos`
 --
 ALTER TABLE `movimientos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
 
 --
 -- AUTO_INCREMENT de la tabla `pasivas`

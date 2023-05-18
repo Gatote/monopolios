@@ -90,7 +90,7 @@ def Consultar_propiedades_Propias(Nombre_Jugador):
     cursor = conn.cursor()
 
     # Hacer un SELECT
-    cursor.execute(f"SELECT nombre, color FROM propiedades where dueño = '{Nombre_Jugador}' AND hipotecado = 0 AND color <> 'Servicio' AND color <> 'Negro'")
+    cursor.execute(f"SELECT nombre, color FROM propiedades where dueño = '{Nombre_Jugador}' AND hipotecado = 0 AND color <> 'Servicio' AND color <> 'Negro' and nivel_renta >= 2")
         
     # Recuperar los nombres y los emojis de los colores de las propiedades disponibles como una lista de tuplas
     propiedades_disponibles = []
@@ -102,6 +102,33 @@ def Consultar_propiedades_Propias(Nombre_Jugador):
     conn.close()
 
     return propiedades_disponibles
+
+def Casa_Disponible(Nombre_Propiedad):
+    # Establecer una conexión a la base de datos
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="admin",
+        password="admin",
+        database="monopolios",
+        charset='utf8mb4'
+    )
+    # Crear un cursor para ejecutar comandos en la base de datos
+    cursor = conn.cursor()
+
+    # Hacer un SELECT
+    cursor.execute(f"set @nombre_propiedad = '{Nombre_Propiedad}'")
+    cursor.execute(f"set @color_propiedad = (select color from propiedades WHERE nombre = @nombre_propiedad COLLATE utf8mb4_general_ci);")
+    cursor.execute(f"set @nivel_propiedad = (select nivel_renta from propiedades WHERE nombre = @nombre_propiedad COLLATE utf8mb4_general_ci);")
+    cursor.execute(f"set @nivel_maximo = (select max(nivel_renta) from propiedades WHERE color = @color_propiedad COLLATE utf8mb4_general_ci);")
+    cursor.execute(f"set @promedio = (SELECT sum(nivel_renta)/count(*) from propiedades where color = @color_propiedad);")
+    cursor.execute(f"set @mismo_nivel = (SELECT if (@promedio = @nivel_maximo, 1,0));")
+    cursor.execute(f"SELECT if ((@nivel_propiedad < @nivel_maximo) or @mismo_nivel ,1,0) as Disponible;")
+
+
+    # Cerrar la conexión a la base de datos
+    conn.close()
+
+    return bool(cursor.fetchone()[0])
 
 def Consultar_Propiedades_Hipotecadas(Nombre_Jugador):
     # Establecer una conexión a la base de datos
@@ -235,48 +262,56 @@ def Consultar_Numero_Casas(Nombre_Propiedad):
 
 def main(Nombre_Jugador, Dinero_Jugador, Impuestos_Para_Parada_Libre):
     col1_pago_banco, col2_pago_banco, col3_pago_banco, col4_pago_banco, col5_pago_banco, col6_pago_banco = st.columns(6)
-    with col1_pago_banco:
-        Razon_Para_Pagar = st.selectbox('Razon', ['Carcel', 'Impuestos', 'Fortuna o Arca Comunal', 'Comprar casa', 'Deshipotecar'], 0, help = 'Motivo para cobrar del banco')
-    with col2_pago_banco:
-        if Razon_Para_Pagar == 'Carcel':
-            st.write('')
-            Monto_A_Pagar_Banco = 50
-            if st.button(f'Pagar ${Monto_A_Pagar_Banco}', disabled = not Monto_A_Pagar_Banco > 0 or Monto_A_Pagar_Banco > Dinero_Jugador):
-                Pagar_Carcel(Nombre_Jugador)
-        elif Razon_Para_Pagar == 'Impuestos':
-            Monto_A_Pagar_Banco = st.number_input('Cantidad',0,200,0,100)
-        elif Razon_Para_Pagar == 'Fortuna o Arca Comunal':
-            Monto_A_Pagar_Banco = st.number_input('Cantidad',0,999999,0,10)
-        elif Razon_Para_Pagar == 'Comprar casa':
-            propiedades_propias = Consultar_propiedades_Propias(Nombre_Jugador)
-            if propiedades_propias != []: 
-                opciones = [f"{nombre} {emoji}" for nombre, emoji in propiedades_propias]
-                Propiedad_Seleccionada = st.selectbox('Propiedad', opciones)
-                emojis = list(colores_emoji.values())
-                for i in emojis:
-                        Propiedad_Seleccionada = Propiedad_Seleccionada.replace(f" {i}","")
-                #st.write(Propiedad_Seleccionada)
-                #st.write(Consultar_Numero_Casas(Propiedad_Seleccionada))
-            else:
-                st.error('No tienes propiedades disponibles para construir')
-                Propiedad_Seleccionada = None
-        elif Razon_Para_Pagar == 'Deshipotecar':
-            propiedades_propias = Consultar_Propiedades_Hipotecadas(Nombre_Jugador)
-            if propiedades_propias != []: 
-                opciones = [f"{nombre} {emoji}" for nombre, emoji in propiedades_propias]
-                Propiedad_Seleccionada = st.selectbox('Propiedad', opciones)
-                emojis = list(colores_emoji.values())
-                for i in emojis:
-                        Propiedad_Seleccionada = Propiedad_Seleccionada.replace(f" {i}","")
+    
+    #columna 1
+    Razon_Para_Pagar = st.selectbox('Razon', ['Carcel', 'Impuestos', 'Fortuna o Arca Comunal', 'Comprar casa', 'Deshipotecar'], 0, help = 'Motivo para cobrar del banco')
+    
+    #columna 2
+    if Razon_Para_Pagar == 'Carcel':
+        st.write('')
+        Monto_A_Pagar_Banco = 50
+        if st.button(f'Pagar ${Monto_A_Pagar_Banco}', disabled = not Monto_A_Pagar_Banco > 0 or Monto_A_Pagar_Banco > Dinero_Jugador):
+            Pagar_Carcel(Nombre_Jugador)
+    elif Razon_Para_Pagar == 'Impuestos':
+        Monto_A_Pagar_Banco = st.number_input('Cantidad',0,200,0,100)
+    elif Razon_Para_Pagar == 'Fortuna o Arca Comunal':
+        Monto_A_Pagar_Banco = st.number_input('Cantidad',0,999999,0,10)
+    elif Razon_Para_Pagar == 'Comprar casa':
+        propiedades_propias = Consultar_propiedades_Propias(Nombre_Jugador)
+        if propiedades_propias != []: 
+            opciones = [f"{nombre} {emoji}" for nombre, emoji in propiedades_propias]
+            Propiedad_Seleccionada = st.selectbox('Propiedad', opciones)
+            emojis = list(colores_emoji.values())
+            for i in emojis:
+                    Propiedad_Seleccionada = Propiedad_Seleccionada.replace(f" {i}","")
+            #st.write(Propiedad_Seleccionada)
+            #st.write(Consultar_Numero_Casas(Propiedad_Seleccionada))
+        else:
+            st.error('No tienes propiedades disponibles para construir')
+            Propiedad_Seleccionada = None
+    elif Razon_Para_Pagar == 'Deshipotecar':
+        propiedades_propias = Consultar_Propiedades_Hipotecadas(Nombre_Jugador)
+        if propiedades_propias != []: 
+            opciones = [f"{nombre} {emoji}" for nombre, emoji in propiedades_propias]
+            Propiedad_Seleccionada = st.selectbox('Propiedad', opciones)
+            emojis = list(colores_emoji.values())
+            for i in emojis:
+                    Propiedad_Seleccionada = Propiedad_Seleccionada.replace(f" {i}","")
+        else:
+            st.error("No tienes propiedades disponibles para deshipotecar")
 
-    with col3_pago_banco:
-        if Razon_Para_Pagar == 'Impuestos':
-            if st.button(f'Pagar ${Monto_A_Pagar_Banco}', disabled = not Monto_A_Pagar_Banco > 0 or Monto_A_Pagar_Banco > Dinero_Jugador, key = 'Pagar_impuestos'):
-                Pagar_Impuestos(Nombre_Jugador, Monto_A_Pagar_Banco, Impuestos_Para_Parada_Libre)
-        elif Razon_Para_Pagar == 'Fortuna o Arca Comunal':
-            if st.button(f'Pagar ${Monto_A_Pagar_Banco}', disabled = not Monto_A_Pagar_Banco > 0 or Monto_A_Pagar_Banco > Dinero_Jugador, key = 'Pagar_Fortuna'):
-                Pagar_A_Banco(Nombre_Jugador,Monto_A_Pagar_Banco)
-        elif Razon_Para_Pagar == 'Comprar casa':
+    #columna 3
+    if Razon_Para_Pagar == 'Impuestos':
+        if st.button(f'Pagar ${Monto_A_Pagar_Banco}', disabled = not Monto_A_Pagar_Banco > 0 or Monto_A_Pagar_Banco > Dinero_Jugador, key = 'Pagar_impuestos'):
+            Pagar_Impuestos(Nombre_Jugador, Monto_A_Pagar_Banco, Impuestos_Para_Parada_Libre)
+    elif Razon_Para_Pagar == 'Fortuna o Arca Comunal':
+        if st.button(f'Pagar ${Monto_A_Pagar_Banco}', disabled = not Monto_A_Pagar_Banco > 0 or Monto_A_Pagar_Banco > Dinero_Jugador, key = 'Pagar_Fortuna'):
+            Pagar_A_Banco(Nombre_Jugador,Monto_A_Pagar_Banco)
+    elif Razon_Para_Pagar == 'Comprar casa':
+        #######
+        if Casa_Disponible(Propiedad_Seleccionada):
+
+
             if Propiedad_Seleccionada != None:
                 Monto_A_Pagar_Banco = Consultar_Precio_Casa(Propiedad_Seleccionada)
                 if Monto_A_Pagar_Banco == None:
@@ -284,14 +319,16 @@ def main(Nombre_Jugador, Dinero_Jugador, Impuestos_Para_Parada_Libre):
                 else:
                     if st.button(f'Pagar ${Monto_A_Pagar_Banco}', disabled = Monto_A_Pagar_Banco > Dinero_Jugador or Monto_A_Pagar_Banco == 0, key = 'Pagar_Casa'):
                         Comprar_Casa(Propiedad_Seleccionada)
-        elif Razon_Para_Pagar == 'Deshipotecar':
-            try:
-                if Propiedad_Seleccionada != None:
-                    Monto_A_Pagar_Banco = Consultar_Precio_Deshipoteca(Propiedad_Seleccionada)
-                    if Monto_A_Pagar_Banco == None:
-                        st.error('No puedes contruir en esta propiedad')
-                    else:
-                        if st.button(f'Pagar ${Monto_A_Pagar_Banco}', disabled = Monto_A_Pagar_Banco > Dinero_Jugador or Monto_A_Pagar_Banco == 0, key = 'Pagar_Casa'):
-                            Deshipotecar_Propiedad(Propiedad_Seleccionada)
-            except:
-                None
+        else:
+            st.error("Las construcciones deben ser al mismo nivel")
+    elif Razon_Para_Pagar == 'Deshipotecar':
+        try:
+            if Propiedad_Seleccionada != None:
+                Monto_A_Pagar_Banco = Consultar_Precio_Deshipoteca(Propiedad_Seleccionada)
+                if Monto_A_Pagar_Banco == None:
+                    st.error('No puedes contruir en esta propiedad')
+                else:
+                    if st.button(f'Pagar ${Monto_A_Pagar_Banco}', disabled = Monto_A_Pagar_Banco > Dinero_Jugador or Monto_A_Pagar_Banco == 0, key = 'Pagar_Casa'):
+                        Deshipotecar_Propiedad(Propiedad_Seleccionada)
+        except:
+            None

@@ -156,19 +156,21 @@ def main(Nombre_Jugador,Dinero_Jugador):
 
                 
     propiedades_disponibles = Consultar_Propiedades_Color(Nombre_Jugador)
+    try:
+        st.subheader('Montar grupo de color')
+        col1_comprar_propiedad,col2_comprar_propiedad = st.columns(2)
+        opciones = [f"{nombre} {emoji}" for nombre, emoji in propiedades_disponibles]
+        with col1_comprar_propiedad:
+            Propiedad_Seleccionada_A_Comprar = st.selectbox('Selecciona una propiedad del grupo a montar', opciones)
 
-    st.subheader('Montar grupo de color')
-    col1_comprar_propiedad,col2_comprar_propiedad = st.columns(2)
-    opciones = [f"{nombre} {emoji}" for nombre, emoji in propiedades_disponibles]
-    with col1_comprar_propiedad:
-        Propiedad_Seleccionada_A_Comprar = st.selectbox('Selecciona una propiedad del grupo a montar', opciones)
-
-    with col2_comprar_propiedad:
-        emojis = list(colores_emoji.values())
-        for i in emojis:
-            Propiedad_Seleccionada_A_Comprar = Propiedad_Seleccionada_A_Comprar.replace(f" {i}","")
-        
-        Precio_Propiedad = Consultar_Precio_Propiedad_Disponible(Propiedad_Seleccionada_A_Comprar)
-        Nombre_Propiedad = Propiedad_Seleccionada_A_Comprar
-        if st.button(f'Montar grupo de color', disabled = False):
-            Montar_Grupo_Color(Nombre_Propiedad)
+        with col2_comprar_propiedad:
+            emojis = list(colores_emoji.values())
+            for i in emojis:
+                Propiedad_Seleccionada_A_Comprar = Propiedad_Seleccionada_A_Comprar.replace(f" {i}","")
+            
+            Precio_Propiedad = Consultar_Precio_Propiedad_Disponible(Propiedad_Seleccionada_A_Comprar)
+            Nombre_Propiedad = Propiedad_Seleccionada_A_Comprar
+            if st.button(f'Montar grupo de color', disabled = False):
+                Montar_Grupo_Color(Nombre_Propiedad)
+    except AttributeError:
+        st.write("")    
