@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 18-05-2023 a las 01:52:52
+-- Tiempo de generación: 18-05-2023 a las 05:16:19
 -- Versión del servidor: 10.4.28-MariaDB
 -- Versión de PHP: 8.2.4
 
@@ -35,10 +35,18 @@ CREATE DEFINER=`admin`@`localhost` PROCEDURE `Cobrar_Parada_Libre` (IN `Nombre_J
 END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Comprar_Casa` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN
-    UPDATE jugadores SET dinero = dinero - (SELECT costo_casa FROM propiedades WHERE nombre = Nombre_Propiedad) WHERE nombre = (SELECT dueño FROM propiedades WHERE nombre = Nombre_Propiedad);
-	UPDATE propiedades SET nivel_renta = nivel_renta + 1 WHERE nombre = Nombre_Propiedad;
-    INSERT INTO movimientos(ACCION) VALUES(CONCAT(Nombre_Propiedad, ' tiene una casa mas!'));
-
+    SET @es_ferrocarril_o_servicio = (SELECT IF(color = 'servicio' OR color = 'negro', 1, 0) from propiedades where nombre = nombre_propiedad);
+    SET @numero_casas = (SELECT NIVEL_RENTA FROM propiedades WHERE nombre = Nombre_Propiedad);
+    IF NOT @es_ferrocarril_o_servicio THEN
+    	IF @numero_casas BETWEEN 2 AND 5 then
+        
+        
+        
+            UPDATE jugadores SET dinero = dinero - (SELECT costo_casa FROM propiedades WHERE nombre = Nombre_Propiedad) WHERE nombre = (SELECT dueño FROM propiedades WHERE nombre = Nombre_Propiedad);
+            UPDATE propiedades SET nivel_renta = nivel_renta + 1 WHERE nombre = Nombre_Propiedad;
+            INSERT INTO movimientos(ACCION) VALUES(CONCAT(Nombre_Propiedad, ' tiene una casa mas!'));
+        END IF;
+	END IF;
 END$$
 
 CREATE DEFINER=`admin`@`localhost` PROCEDURE `Comprar_Propiedad` (IN `nombre_jugador` VARCHAR(30), IN `vdinero_jugador` INT(6), IN `nombre_propiedad` VARCHAR(30), IN `vcosto_propiedad` INT(6))   BEGIN
@@ -52,22 +60,51 @@ END$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Consultar_Dinero_Neto` (IN `Nombre_Jugador` VARCHAR(30))   SELECT (SELECT dinero FROM jugadores WHERE nombre COLLATE utf8mb4_general_ci = Nombre_Jugador COLLATE utf8mb4_general_ci) + 
 (IFNULL((SELECT SUM(hipoteca) FROM propiedades WHERE dueño COLLATE utf8mb4_general_ci = Nombre_Jugador COLLATE utf8mb4_general_ci AND hipotecado = 0), 0))$$
 
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Consultar_Numero_Casas` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN
+	set @nombre_propiedad = Nombre_Propiedad;
+    SELECT nivel_renta FROM propiedades WHERE nombre = @nombre_propiedad;
+END$$
+
 CREATE DEFINER=`admin`@`localhost` PROCEDURE `Consultar_Renta` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN
-	SET @nivel_renta = (SELECT nivel_renta FROM propiedades WHERE nombre = Nombre_Propiedad);
-	IF @nivel_renta = 1 THEN
-    	(SELECT renta FROM propiedades WHERE nombre = Nombre_Propiedad);
-    ELSEIF @nivel_renta = 2 THEN
-    	(SELECT renta_grupo FROM propiedades WHERE nombre = Nombre_Propiedad);
-    ELSEIF @nivel_renta = 3 THEN
-    	(SELECT renta_1 FROM propiedades WHERE nombre = Nombre_Propiedad);
-    ELSEIF @nivel_renta = 4 THEN
-    	(SELECT renta_2 FROM propiedades WHERE nombre = Nombre_Propiedad);
-    ELSEIF @nivel_renta = 5 THEN
-    	(SELECT renta_3 FROM propiedades WHERE nombre = Nombre_Propiedad);
-    ELSEIF @nivel_renta = 6 THEN
-    	(SELECT renta_4 FROM propiedades WHERE nombre = Nombre_Propiedad);
-    ELSEIF @nivel_renta = 7 THEN
-    	(SELECT renta_5 FROM propiedades WHERE nombre = Nombre_Propiedad);
+    SET @nombre_propiedad = Nombre_Propiedad;
+    SET @es_ferrocarril = (SELECT IF(color = 'negro', 1, 0) from propiedades where nombre = nombre_propiedad);
+	set @nombre_jugador = (SELECT dueño FROM `propiedades` WHERE nombre COLLATE utf8mb4_general_ci = @nombre_propiedad COLLATE utf8mb4_general_ci);
+    SET @color_propiedad = (SELECT color FROM `propiedades` WHERE nombre COLLATE utf8mb4_general_ci = @nombre_propiedad COLLATE utf8mb4_general_ci);
+    set @numero_propiedades_color = (SELECT count(*) FROM `propiedades` WHERE color = @color_propiedad);
+    set @numero_propiedades_obtenidas = (SELECT count(*) FROM `propiedades` WHERE dueño COLLATE utf8mb4_general_ci = @nombre_jugador COLLATE utf8mb4_general_ci);
+
+	if @es_ferrocarril THEN
+    	if @numero_propiedades_obtenidas = 1 THEN
+            SELECT 25;
+        elseif @numero_propiedades_obtenidas = 2 THEN
+            SELECT 50;
+        elseif @numero_propiedades_obtenidas = 3 THEN
+            SELECT 100;
+        elseif @numero_propiedades_obtenidas = 4 THEN
+            SELECT 200;
+        END IF;
+    ELSE
+        if @numero_propiedades_color = @numero_propiedades_obtenidas THEN
+            (SELECT renta_grupo FROM propiedades WHERE nombre = Nombre_Propiedad);
+        else
+
+            SET @nivel_renta = (SELECT nivel_renta FROM propiedades WHERE nombre = Nombre_Propiedad);
+            IF @nivel_renta = 1 THEN
+                (SELECT renta FROM propiedades WHERE nombre = Nombre_Propiedad);
+            ELSEIF @nivel_renta = 2 THEN
+                (SELECT renta_grupo FROM propiedades WHERE nombre = Nombre_Propiedad);
+            ELSEIF @nivel_renta = 3 THEN
+                (SELECT renta_1 FROM propiedades WHERE nombre = Nombre_Propiedad);
+            ELSEIF @nivel_renta = 4 THEN
+                (SELECT renta_2 FROM propiedades WHERE nombre = Nombre_Propiedad);
+            ELSEIF @nivel_renta = 5 THEN
+                (SELECT renta_3 FROM propiedades WHERE nombre = Nombre_Propiedad);
+            ELSEIF @nivel_renta = 6 THEN
+                (SELECT renta_4 FROM propiedades WHERE nombre = Nombre_Propiedad);
+            ELSEIF @nivel_renta = 7 THEN
+                (SELECT renta_5 FROM propiedades WHERE nombre = Nombre_Propiedad);
+            END IF;
+        END IF;
     END IF;
 END$$
 
@@ -90,15 +127,38 @@ CREATE DEFINER=`admin`@`localhost` PROCEDURE `Crear_Jugador` (IN `vnombre` VARCH
 END$$
 
 CREATE DEFINER=`admin`@`localhost` PROCEDURE `Dar_Propiedad_Trato` (IN `Nombre_Propiedad` VARCHAR(30), IN `Nombre_Jugador_Receptor` VARCHAR(30))   BEGIN
+	SET @color = (SELECT color FROM propiedades WHERE nombre = Nombre_Propiedad);
 	SET @dueno_anterior = (SELECT dueño FROM propiedades WHERE nombre = Nombre_Propiedad);
 	UPDATE propiedades SET dueño = Nombre_Jugador_Receptor WHERE nombre = Nombre_Propiedad;
+	UPDATE propiedades SET nivel_renta = 1 WHERE color = @color;
     INSERT INTO movimientos (accion) VALUES(concat(@dueno_anterior, " dio ", Nombre_Propiedad, " a ", Nombre_Jugador_Receptor)); 
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Deshipotecar_Propiedad` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN
+    UPDATE propiedades SET hipotecado = 0 where nombre = Nombre_Propiedad;
+    UPDATE jugadores SET dinero = dinero - (SELECT costo_deshipoteca FROM propiedades WHERE nombre = Nombre_Propiedad);
+    INSERT INTO movimientos (accion) VALUES (CONCAT((SELECT dueño FROM propiedades WHERE nombre = Nombre_Propiedad), ' deshipotecó ', Nombre_Propiedad));
 END$$
 
 CREATE DEFINER=`admin`@`localhost` PROCEDURE `Hipotecar_Propiedad` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN
     UPDATE propiedades SET hipotecado = 1 where nombre = Nombre_Propiedad;
     UPDATE jugadores SET dinero = dinero + (SELECT hipoteca FROM propiedades WHERE nombre = Nombre_Propiedad);
     INSERT INTO movimientos (accion) VALUES (CONCAT((SELECT dueño FROM propiedades WHERE nombre = Nombre_Propiedad), ' hipoteco ', Nombre_Propiedad));
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Montar_Grupo_Color` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN
+	set @nombre_propiedad = Nombre_Propiedad;
+    SET @nombre_jugador = (SELECT dueño FROM propiedades WHERE NOMBRE = @nombre_propiedad);
+	SET @color_propiedad = (SELECT COLOR FROM propiedades WHERE NOMBRE = @nombre_propiedad);
+    set @numero_propiedades_color = (SELECT count(*) FROM `propiedades` WHERE color = @color_propiedad);
+    set @numero_propiedades_obtenidas = (SELECT count(*) FROM `propiedades` WHERE dueño COLLATE utf8mb4_general_ci = @nombre_jugador COLLATE utf8mb4_general_ci and color = @color_propiedad);
+    IF @numero_propiedades_color = @numero_propiedades_obtenidas THEN
+    	UPDATE propiedades SET nivel_renta = 2 WHERE color = @color_propiedad;
+        INSERT into movimientos(accion) VALUES (concat(@nombre_jugador, ' hizo el grupo de color ', @color_propiedad, '!'));
+    	SELECT concat('Montaste el grupo de color ', @color_propiedad) AS Mensaje;
+    ELSE
+    	SELECT concat('No tienes todas las propiedades disponibles', @color_propiedad) AS Mensaje;
+    END IF;
 END$$
 
 CREATE DEFINER=`admin`@`localhost` PROCEDURE `Nuevo_Juego` (IN `v_impuestos_para_parada_libre` BOOLEAN, IN `v_dinero_inicio_personaliazdo` BOOLEAN, IN `v_dinero_inicio` INT, IN `v_bono_salida` BOOLEAN, IN `v_pasivas_activas` BOOLEAN, IN `v_modo_exponencial` BOOLEAN, IN `v_jugador_moderador` VARCHAR(30), IN `v_tratos_con_propiedades_disponibles` BOOLEAN)   BEGIN
@@ -264,15 +324,6 @@ CREATE TABLE `jugadores` (
   `activo` tinyint(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Volcado de datos para la tabla `jugadores`
---
-
-INSERT INTO `jugadores` (`nombre`, `contraseña`, `dinero`, `pasiva`, `turnos_restantes`, `activo`) VALUES
-('Bruneishon', 'Bruno', 1388, NULL, 0, 1),
-('Bruneishonn\'t', 'Bruno', 1500, NULL, 0, 1),
-('gato', 'gato', 1492, NULL, 0, 1);
-
 -- --------------------------------------------------------
 
 --
@@ -290,15 +341,7 @@ CREATE TABLE `movimientos` (
 --
 
 INSERT INTO `movimientos` (`id`, `accion`, `tiempo`) VALUES
-(1, 'Comienza el juego', '2023-05-17 15:10:44'),
-(2, 'Bruneishon se unió, Dinero: $1500', '2023-05-17 15:11:13'),
-(3, 'Bruneishonn\'t se unió, Dinero: $1500', '2023-05-17 15:11:58'),
-(4, 'Bruneishon compró Avenida Mediterraneo', '2023-05-17 15:12:28'),
-(5, 'Bruneishon compró Avenida Baltica', '2023-05-17 15:13:14'),
-(6, 'gato se unió, Dinero: $1500', '2023-05-17 15:17:02'),
-(7, 'gato pagó $2 a Bruneishon', '2023-05-17 15:20:15'),
-(8, 'gato pagó $2 a Bruneishon', '2023-05-17 15:20:16'),
-(9, 'gato pagó $4 a Bruneishon', '2023-05-17 15:20:23');
+(1, 'Comienza el juego', '2023-05-17 21:05:38');
 
 -- --------------------------------------------------------
 
@@ -346,13 +389,13 @@ CREATE TABLE `propiedades` (
   `nombre` varchar(30) NOT NULL,
   `color` varchar(20) NOT NULL,
   `precio` int(6) NOT NULL,
-  `renta` int(4) NOT NULL,
-  `renta_grupo` int(4) NOT NULL,
-  `renta_1` int(4) NOT NULL,
-  `renta_2` int(4) NOT NULL,
-  `renta_3` int(4) NOT NULL,
-  `renta_4` int(4) NOT NULL,
-  `renta_5` int(4) NOT NULL,
+  `renta` int(4) DEFAULT NULL,
+  `renta_grupo` int(4) DEFAULT NULL,
+  `renta_1` int(4) DEFAULT NULL,
+  `renta_2` int(4) DEFAULT NULL,
+  `renta_3` int(4) DEFAULT NULL,
+  `renta_4` int(4) DEFAULT NULL,
+  `renta_5` int(4) DEFAULT NULL,
   `costo_casa` int(6) DEFAULT NULL,
   `hipoteca` int(6) NOT NULL,
   `costo_deshipoteca` int(6) NOT NULL,
@@ -366,34 +409,34 @@ CREATE TABLE `propiedades` (
 --
 
 INSERT INTO `propiedades` (`id`, `nombre`, `color`, `precio`, `renta`, `renta_grupo`, `renta_1`, `renta_2`, `renta_3`, `renta_4`, `renta_5`, `costo_casa`, `hipoteca`, `costo_deshipoteca`, `dueño`, `hipotecado`, `nivel_renta`) VALUES
-(1, 'Avenida Mediterraneo', 'Marron', 60, 2, 4, 10, 30, 90, 160, 250, 50, 30, 33, 'Bruneishon', 0, 1),
-(2, 'Avenida Baltica', 'Marron', 60, 4, 8, 20, 60, 180, 320, 450, 50, 30, 33, 'Bruneishon', 0, 1),
-(3, 'Ferrocarril de Reading', 'Negro', 200, 6, 0, 0, 0, 0, 0, 0, NULL, 100, 110, NULL, 0, 1),
+(1, 'Avenida Mediterraneo', 'Marron', 60, 2, 4, 10, 30, 90, 160, 250, 50, 30, 33, NULL, 0, 1),
+(2, 'Avenida Baltica', 'Marron', 60, 4, 8, 20, 60, 180, 320, 450, 50, 30, 33, NULL, 0, 1),
+(3, 'Ferrocarril de Reading', 'Negro', 200, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 100, 110, NULL, 0, 1),
 (4, 'Avenida Oriental', 'Celeste', 100, 6, 12, 30, 90, 270, 400, 550, 50, 50, 55, NULL, 0, 1),
-(5, 'Avenida Vermont', 'Celeste', 100, 6, 12, 30, 90, 270, 400, 550, 50, 50, 55, NULL, 0, 1),
+(5, 'Avenida Vermont', 'Celeste', 100, 6, 12, 30, 90, 270, 0, 550, 50, 50, 55, NULL, 0, 1),
 (6, 'Avenida Connecticut', 'Celeste', 120, 6, 12, 40, 100, 300, 450, 600, 50, 60, 66, NULL, 0, 1),
-(7, 'Plaza San Carlos', 'Morado', 140, 10, 0, 0, 0, 0, 0, 0, 100, 70, 77, NULL, 0, 1),
-(8, 'Compañía de Electricidad', 'Servicio', 150, 1, 0, 0, 0, 0, 0, 0, NULL, 75, 83, NULL, 0, 1),
-(9, 'Avenida Estados', 'Morado', 140, 0, 0, 0, 0, 0, 0, 0, 100, 70, 77, NULL, 0, 1),
-(10, 'Avenida Virginia', 'Morado', 160, 0, 0, 0, 0, 0, 0, 0, 100, 80, 88, NULL, 0, 1),
-(11, 'Ferrocarril Pensilvania', 'Negro', 200, 0, 0, 0, 0, 0, 0, 0, NULL, 100, 110, NULL, 0, 1),
-(12, 'Avenida San James', 'Naranja', 180, 0, 0, 0, 0, 0, 0, 0, 100, 90, 99, NULL, 0, 1),
-(13, 'Avenida Tennessee', 'Naranja', 180, 0, 0, 0, 0, 0, 0, 0, 100, 90, 99, NULL, 0, 1),
-(14, 'Avenida Nueva York', 'Naranja', 200, 0, 0, 0, 0, 0, 0, 0, 100, 100, 110, NULL, 0, 1),
-(15, 'Avenida Kentucky', 'Rojo', 220, 0, 0, 0, 0, 0, 0, 0, 150, 110, 110, NULL, 0, 1),
-(16, 'Avenida Indiana', 'Rojo', 220, 0, 0, 0, 0, 0, 0, 0, 150, 110, 110, NULL, 0, 1),
-(17, 'Avenida Illinois', 'Rojo', 240, 0, 0, 0, 0, 0, 0, 0, 150, 120, 142, NULL, 0, 1),
-(18, 'Ferrocarril B&O', 'Negro', 200, 0, 0, 0, 0, 0, 0, 0, NULL, 100, 110, NULL, 0, 1),
-(19, 'Avenida Atlantico', 'Amarillo', 260, 0, 0, 0, 0, 0, 0, 0, 150, 130, 143, NULL, 0, 1),
-(20, 'Avenida Ventnor', 'Amarillo', 260, 0, 0, 0, 0, 0, 0, 0, 150, 130, 143, NULL, 0, 1),
-(21, 'Compañía de Agua', 'Servicio', 150, 0, 0, 0, 0, 0, 0, 0, NULL, 75, 83, NULL, 0, 1),
-(22, 'Jardines Marvin', 'Amarillo', 280, 0, 0, 0, 0, 0, 0, 0, 150, 140, 154, NULL, 0, 1),
-(23, 'Avenida Pacifico', 'Verde', 300, 0, 0, 0, 0, 0, 0, 0, 200, 150, 165, NULL, 0, 1),
-(24, 'Avenida Carolina del Norte', 'Verde', 300, 0, 0, 0, 0, 0, 0, 0, 200, 150, 165, NULL, 0, 1),
-(25, 'Avenida Pensilvania', 'Verde', 320, 0, 0, 0, 0, 0, 0, 0, 200, 160, 175, NULL, 0, 1),
-(26, 'Ferrocarril Via Rápida', 'Negro', 200, 0, 0, 0, 0, 0, 0, 0, NULL, 100, 110, NULL, 0, 1),
-(27, 'Plaza Park', 'Azul', 350, 0, 0, 0, 0, 0, 0, 0, 200, 175, 193, NULL, 0, 1),
-(28, 'El Muelle', 'Azul', 400, 0, 0, 0, 0, 0, 0, 0, 200, 200, 220, NULL, 0, 1);
+(7, 'Plaza San Carlos', 'Morado', 140, 10, 20, 50, 150, 450, 625, 750, 100, 70, 77, NULL, 0, 1),
+(8, 'Compañía de Electricidad', 'Servicio', 150, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 75, 83, NULL, 0, 1),
+(9, 'Avenida Estados', 'Morado', 140, 10, 20, 50, 150, 450, 625, 750, 100, 70, 77, NULL, 0, 1),
+(10, 'Avenida Virginia', 'Morado', 160, 12, 24, 60, 180, 500, 500, 700, 100, 80, 88, NULL, 0, 1),
+(11, 'Ferrocarril Pensilvania', 'Negro', 200, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 100, 110, NULL, 0, 1),
+(12, 'Avenida San James', 'Naranja', 180, 14, 28, 70, 200, 550, 750, 950, 100, 90, 99, NULL, 0, 1),
+(13, 'Avenida Tennessee', 'Naranja', 180, 14, 28, 70, 20, 550, 750, 950, 100, 90, 99, NULL, 0, 1),
+(14, 'Avenida Nueva York', 'Naranja', 200, 16, 32, 80, 220, 600, 800, 1000, 100, 100, 110, NULL, 0, 1),
+(15, 'Avenida Kentucky', 'Rojo', 220, 18, 36, 90, 250, 700, 875, 1050, 150, 110, 110, NULL, 0, 1),
+(16, 'Avenida Indiana', 'Rojo', 220, 18, 36, 90, 250, 700, 875, 1050, 150, 110, 110, NULL, 0, 1),
+(17, 'Avenida Illinois', 'Rojo', 240, 20, 40, 100, 300, 750, 925, 1100, 150, 120, 142, NULL, 0, 1),
+(18, 'Ferrocarril B&O', 'Negro', 200, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 100, 110, NULL, 0, 1),
+(19, 'Avenida Atlantico', 'Amarillo', 260, 22, 44, 110, 330, 800, 975, 1150, 150, 130, 143, NULL, 0, 1),
+(20, 'Avenida Ventnor', 'Amarillo', 260, 22, 44, 110, 330, 800, 975, 1150, 150, 130, 143, NULL, 0, 1),
+(21, 'Compañía de Agua', 'Servicio', 150, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 75, 83, NULL, 0, 1),
+(22, 'Jardines Marvin', 'Amarillo', 280, 24, 48, 120, 360, 850, 1025, 1200, 150, 140, 154, NULL, 0, 1),
+(23, 'Avenida Pacifico', 'Verde', 300, 26, 52, 130, 390, 900, 1100, 1275, 200, 150, 165, NULL, 0, 1),
+(24, 'Avenida Carolina del Norte', 'Verde', 300, 26, 52, 130, 390, 900, 1100, 1275, 200, 150, 165, NULL, 0, 1),
+(25, 'Avenida Pensilvania', 'Verde', 320, 28, 56, 150, 450, 1000, 1200, 1400, 200, 160, 175, NULL, 0, 1),
+(26, 'Ferrocarril Via Rápida', 'Negro', 200, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 100, 110, NULL, 0, 1),
+(27, 'Plaza Park', 'Azul', 350, 35, 70, 175, 500, 1100, 1300, 1500, 200, 175, 193, NULL, 0, 1),
+(28, 'El Muelle', 'Azul', 400, 50, 100, 200, 600, 1400, 1700, 2000, 200, 200, 220, NULL, 0, 1);
 
 -- --------------------------------------------------------
 
@@ -469,7 +512,7 @@ ALTER TABLE `propiedades`
 -- AUTO_INCREMENT de la tabla `movimientos`
 --
 ALTER TABLE `movimientos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT de la tabla `pasivas`
