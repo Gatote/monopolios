@@ -103,6 +103,25 @@ def Hipotecar_Propiedad(Nombre_Propiedad):
     time.sleep(1)
     st.experimental_rerun()
 
+def Cobrar_Parada_Libre(Nombre_Jugador):
+    # Establecer una conexión a la base de datos
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="admin",
+        password="admin",
+        database="monopolios"
+    )
+    # Crear un cursor para ejecutar comandos en la base de datos
+    cursor = conn.cursor()
+
+    # Hacer un SELECT
+    cursor.callproc('Cobrar_Parada_Libre', (Nombre_Jugador,))
+    conn.commit()
+    
+    # Cerrar la conexión a la base de datos
+    conn.close()
+    time.sleep(1)
+    st.experimental_rerun()
 
 # Diccionario que asocia cada nombre de color con el emoji correspondiente
 colores_emoji = {
@@ -230,7 +249,8 @@ def Consultar_Hipoteca(Nombre_Propiedad):
     conn.close()
     return res
 
-def main(Nombre_Jugador, Bono_Salida):
+
+def main(Nombre_Jugador, Bono_Salida, Impuestos_Para_Parada_Libre, Acomulado_Parada_Libre):
     #%d %e %f %g %i %u
     col1_cobro_banco, col2_cobro_banco, col3_cobro_banco, a2, a3, a4 = st.columns(6)
     with col1_cobro_banco:
@@ -238,6 +258,8 @@ def main(Nombre_Jugador, Bono_Salida):
             opciones = ['Vuelta', 'Impuestos', 'Vender casa', 'Hipotecar']
         else:
             opciones = ['Vuelta', 'Impuestos', 'Vuelta doble!', 'Vender casa', 'Hipotecar']
+        if Impuestos_Para_Parada_Libre:
+            opciones.append("Parada libre")
         razon_cobrar = st.selectbox('Razon', opciones, 0, help = 'Motivo para cobrar del banco')
             
     with col2_cobro_banco:  
@@ -256,10 +278,11 @@ def main(Nombre_Jugador, Bono_Salida):
             propiedades_propias = Consultar_propiedades_Propias(Nombre_Jugador)
             
             if propiedades_propias == []:
-                st.error('No tienes construcciones en tus propiedades')
+                st.error('No propiedades!')
             else:
                 opciones = [f"{nombre} {emoji}" for nombre, emoji in propiedades_propias]
                 Propiedad_Seleccionada = st.selectbox('Propiedad', opciones, key = 'Propiedad_Vender_casa')
+                
                 emojis = list(colores_emoji.values())
                 for i in emojis:
                     Propiedad_Seleccionada = Propiedad_Seleccionada.replace(f" {i}","")
@@ -274,6 +297,10 @@ def main(Nombre_Jugador, Bono_Salida):
                 emojis = list(colores_emoji.values())
                 for i in emojis:
                     Propiedad_Seleccionada = Propiedad_Seleccionada.replace(f" {i}","")
+        elif razon_cobrar == "Parada libre":
+            if st.button(f'Cobrar ${Acomulado_Parada_Libre}', key = 'Cobrar_Acomulado_Parada_Libre', disabled = Acomulado_Parada_Libre == 0):
+                Cobrar_Parada_Libre(Nombre_Jugador)
+
 
     with col3_cobro_banco:
         if razon_cobrar == 'Impuestos':

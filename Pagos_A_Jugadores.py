@@ -103,25 +103,27 @@ def Consultar_Renta(Nombre_Propiedad):
     try:
         # Llamar al procedimiento almacenado
         cursor.callproc('Consultar_Renta', [Nombre_Propiedad])
-        res=[[]]
-        if res == [[]]:
-            res = [[0]]
+        res=[[0]]
         # Obtener el resultado del procedimiento almacenado
         for result in cursor.stored_results():
             res = result.fetchall()
         
         # Confirmar los cambios en la base de datos
         conn.commit()
-
+        
+        if res == []:
+            return 0
         return res[0][0]
 
     except mysql.connector.Error as error:
-        print("Error al ejecutar el procedimiento almacenado: {}".format(error))
+        #st.write("Error al ejecutar el procedimiento almacenado: {}".format(error))
+        return 0
 
     finally:
         # Cerrar el cursor y la conexión a la base de datos
         cursor.close()
         conn.close()
+
 
 
 def main(Nombre_Jugador,Dinero_Jugador, Multiplicador_Exponencial):
@@ -160,14 +162,14 @@ def main(Nombre_Jugador,Dinero_Jugador, Multiplicador_Exponencial):
                 Monto_A_Pagar_Jugador = Consultar_Renta(Propiedad_Seleccionada)
                 #st.write(t_Propiedad_Seleccionada)
                 if t_Propiedad_Seleccionada in ["🔧"]:
-                    valor_pago = st.number_input(label = 'Valor de pago',min_value = 0, value = 0, step = (1 * Multiplicador_Exponencial), help = 'Total de pago a jugador',key='valorpago_renta')
-                elif t_Propiedad_Seleccionada in ["⚫"]:
-                    valor_pago = st.select_slider("Valor de pago",[25,50,100,200], help = 'Total de pago a jugador',key='valorpago_renta', value = 25)
+                    #valor_pago = st.number_input(label = 'Valor de pago',min_value = 0, value = 0, step = (1 * Multiplicador_Exponencial), help = 'Total de pago a jugador',key='valorpago_renta')
+
+                    valor_pago = st.select_slider("Valor de pago",[0,1,2,3,4,5,6,7,8,9,10,11,12,13,15,15], help = 'Total de pago a jugador',key='valorpago_renta', value =0)
                     #valor_pago = st.number_input(label = 'Valor de pago',min_value = 0, value = 0, step = (25 * Multiplicador_Exponencial), help = 'Total de pago a jugador',key='valorpago_renta')
                     if st.button(f'Pagar ${valor_pago * Multiplicador_Exponencial}', disabled = valor_pago > Dinero_Jugador or valor_pago == 0, key = 'Pagar_Renta'):
                         Pagar_A_Jugador(Nombre_Jugador,jugador2, valor_pago * Multiplicador_Exponencial)
 
-                elif Monto_A_Pagar_Jugador == None or not t_Propiedad_Seleccionada in ["⚫", "🔧"]:
+                elif Monto_A_Pagar_Jugador != None or not t_Propiedad_Seleccionada in ["🔧"]:
                     if st.button(f'Pagar ${Monto_A_Pagar_Jugador * Multiplicador_Exponencial}', disabled = Monto_A_Pagar_Jugador > Dinero_Jugador or Monto_A_Pagar_Jugador == 0, key = 'Pagar_Renta'):
                         Pagar_A_Jugador(Nombre_Jugador,jugador2,Monto_A_Pagar_Jugador * Multiplicador_Exponencial)
 

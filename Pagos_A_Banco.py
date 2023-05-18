@@ -103,6 +103,70 @@ def Consultar_propiedades_Propias(Nombre_Jugador):
 
     return propiedades_disponibles
 
+def Consultar_Propiedades_Hipotecadas(Nombre_Jugador):
+    # Establecer una conexión a la base de datos
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="admin",
+        password="admin",
+        database="monopolios"
+    )
+    # Crear un cursor para ejecutar comandos en la base de datos
+    cursor = conn.cursor()
+
+    # Hacer un SELECT
+    cursor.execute(f"SELECT nombre, color FROM propiedades where dueño = '{Nombre_Jugador}' AND hipotecado = 1")
+        
+    # Recuperar los nombres y los emojis de los colores de las propiedades disponibles como una lista de tuplas
+    propiedades_disponibles = []
+    for nombre, color in cursor.fetchall():
+        emoji_color = colores_emoji[color]
+        propiedades_disponibles.append((nombre, emoji_color))
+
+    # Cerrar la conexión a la base de datos
+    conn.close()
+
+    return propiedades_disponibles
+
+def Consultar_Precio_Deshipoteca(Nombre_Propiedad):
+    # Establecer una conexión a la base de datos
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="admin",
+        password="admin",
+        database="monopolios"
+    )
+    # Crear un cursor para ejecutar comandos en la base de datos
+    cursor = conn.cursor()
+
+    # Hacer un SELECT
+    cursor.execute(f"SELECT costo_deshipoteca FROM propiedades where nombre = '{Nombre_Propiedad}'")
+        
+
+    # Cerrar la conexión a la base de datos
+    conn.close()
+    return cursor.fetchone()[0]
+
+def Deshipotecar_Propiedad(Nombre_Propiedad):
+    # Establecer una conexión a la base de datos
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="admin",
+        password="admin",
+        database="monopolios"
+    )
+    # Crear un cursor para ejecutar comandos en la base de datos
+    cursor = conn.cursor()
+
+    # Hacer un SELECT
+    cursor.callproc('Deshipotecar_Propiedad', (Nombre_Propiedad,))
+    conn.commit()
+    
+    # Cerrar la conexión a la base de datos
+    conn.close()
+    time.sleep(1)
+    st.experimental_rerun()
+
 def Consultar_Precio_Casa(Nombre_Propiedad):
     # Establecer una conexión a la base de datos
     conn = mysql.connector.connect(
@@ -145,10 +209,34 @@ def Comprar_Casa(Nombre_Propiedad):
     time.sleep(1)
     st.experimental_rerun()
 
+def Consultar_Numero_Casas(Nombre_Propiedad):
+    # Establecer una conexión a la base de datos
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="admin",
+        password="admin",
+        database="monopolios"
+    )
+    # Crear un cursor para ejecutar comandos en la base de datos
+    cursor = conn.cursor()
+
+    st.write(Nombre_Propiedad)
+    # Hacer un SELECT
+    cursor.callproc('Consultar_Numero_Casas', (Nombre_Propiedad,))
+
+    # Cerrar la conexión a la base de datos
+    conn.close()
+    resultados = cursor.fetchall()
+    if resultados:
+        return resultados
+    else:
+        return 0
+
+
 def main(Nombre_Jugador, Dinero_Jugador, Impuestos_Para_Parada_Libre):
     col1_pago_banco, col2_pago_banco, col3_pago_banco, col4_pago_banco, col5_pago_banco, col6_pago_banco = st.columns(6)
     with col1_pago_banco:
-        Razon_Para_Pagar = st.selectbox('Razon', ['Carcel', 'Impuestos', 'Fortuna o Arca Comunal', 'Comprar casa'], 0, help = 'Motivo para cobrar del banco')
+        Razon_Para_Pagar = st.selectbox('Razon', ['Carcel', 'Impuestos', 'Fortuna o Arca Comunal', 'Comprar casa', 'Deshipotecar'], 0, help = 'Motivo para cobrar del banco')
     with col2_pago_banco:
         if Razon_Para_Pagar == 'Carcel':
             st.write('')
@@ -167,9 +255,19 @@ def main(Nombre_Jugador, Dinero_Jugador, Impuestos_Para_Parada_Libre):
                 emojis = list(colores_emoji.values())
                 for i in emojis:
                         Propiedad_Seleccionada = Propiedad_Seleccionada.replace(f" {i}","")
+                #st.write(Propiedad_Seleccionada)
+                #st.write(Consultar_Numero_Casas(Propiedad_Seleccionada))
             else:
                 st.error('No tienes propiedades disponibles para construir')
                 Propiedad_Seleccionada = None
+        elif Razon_Para_Pagar == 'Deshipotecar':
+            propiedades_propias = Consultar_Propiedades_Hipotecadas(Nombre_Jugador)
+            if propiedades_propias != []: 
+                opciones = [f"{nombre} {emoji}" for nombre, emoji in propiedades_propias]
+                Propiedad_Seleccionada = st.selectbox('Propiedad', opciones)
+                emojis = list(colores_emoji.values())
+                for i in emojis:
+                        Propiedad_Seleccionada = Propiedad_Seleccionada.replace(f" {i}","")
 
     with col3_pago_banco:
         if Razon_Para_Pagar == 'Impuestos':
@@ -186,3 +284,14 @@ def main(Nombre_Jugador, Dinero_Jugador, Impuestos_Para_Parada_Libre):
                 else:
                     if st.button(f'Pagar ${Monto_A_Pagar_Banco}', disabled = Monto_A_Pagar_Banco > Dinero_Jugador or Monto_A_Pagar_Banco == 0, key = 'Pagar_Casa'):
                         Comprar_Casa(Propiedad_Seleccionada)
+        elif Razon_Para_Pagar == 'Deshipotecar':
+            try:
+                if Propiedad_Seleccionada != None:
+                    Monto_A_Pagar_Banco = Consultar_Precio_Deshipoteca(Propiedad_Seleccionada)
+                    if Monto_A_Pagar_Banco == None:
+                        st.error('No puedes contruir en esta propiedad')
+                    else:
+                        if st.button(f'Pagar ${Monto_A_Pagar_Banco}', disabled = Monto_A_Pagar_Banco > Dinero_Jugador or Monto_A_Pagar_Banco == 0, key = 'Pagar_Casa'):
+                            Deshipotecar_Propiedad(Propiedad_Seleccionada)
+            except:
+                None

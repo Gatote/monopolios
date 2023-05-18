@@ -51,7 +51,7 @@ def consulta_movimientos(limite):
     conn.close()
     return resultados
     
-def consulta_jugadores():
+def consulta_jugadores(Pasivas_Activas):
     # Establecer una conexión a la base de datos
     conn = mysql.connector.connect(
         host="localhost",
@@ -62,8 +62,12 @@ def consulta_jugadores():
     # Crear un cursor para ejecutar comandos en la base de datos
     cursor = conn.cursor()
 
-    # Hacer un SELECT
-    cursor.execute(f"SELECT nombre, dinero, pasiva, turnos_restantes FROM jugadores")
+    if Pasivas_Activas:
+        # Hacer un SELECT
+        cursor.execute(f"SELECT nombre, dinero, pasiva, turnos_restantes FROM jugadores")
+    else:
+        # Hacer un SELECT
+        cursor.execute(f"SELECT nombre, dinero FROM jugadores")
         
         
     try:
@@ -113,8 +117,12 @@ def main(Impuestos_Para_Parada_Libre, Acomulado_Parada_Libre, Dinero_Inicio_Pers
             st.subheader('Jugadores')
         with col2_jugadores:
             st.button('Recargar', key = 'recargar 2')
-        jugadores=pd.DataFrame(consulta_jugadores(),columns=('Jugador','Dinero','Pasiva','CD'))
-        st.table(jugadores)
+        if not Pasivas_Activas:
+            jugadores=pd.DataFrame(consulta_jugadores(Pasivas_Activas),columns=('Jugador','Dinero'))
+            st.table(jugadores)
+        else:
+            jugadores=pd.DataFrame(consulta_jugadores(),columns=('Jugador','Dinero','Pasiva','CD'))
+            st.table(jugadores)
 
         st.title("Características del juego")
         variables = ""

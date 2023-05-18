@@ -72,7 +72,7 @@ def Consultar_Propiedades_Propias(Nombre_Jugador):
     cursor = conn.cursor()
 
     # Hacer un SELECT
-    cursor.execute(f"SELECT nombre, color FROM propiedades where dueño = '{Nombre_Jugador}' and nivel_renta = 1")
+    cursor.execute(f"SELECT nombre, color FROM propiedades where dueño = '{Nombre_Jugador}' and nivel_renta between 1 and 2")
         
     # Recuperar los nombres y los emojis de los colores de las propiedades disponibles como una lista de tuplas
     propiedades_disponibles = []

@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 14-05-2023 a las 23:19:04
+-- Tiempo de generación: 18-05-2023 a las 01:52:52
 -- Versión del servidor: 10.4.28-MariaDB
 -- Versión de PHP: 8.2.4
 
@@ -25,6 +25,15 @@ DELIMITER $$
 --
 -- Procedimientos
 --
+CREATE DEFINER=`admin`@`localhost` PROCEDURE `Cobrar_Parada_Libre` (IN `Nombre_Jugador` VARCHAR(30))   BEGIN
+	SET @dinero_parada_libre = (SELECT ACOMULADO_PARADA_LIBRE FROM VARIABLES);
+	IF (SELECT IMPUESTOS_PARA_PARADA_LIBRE FROM variables) = 1 THEN
+    	UPDATE jugadores SET DINERO = DINERO + @dinero_parada_libre WHERE NOMBRE = Nombre_Jugador;
+        UPDATE variables SET ACOMULADO_PARADA_LIBRE = 0;
+        INSERT INTO movimientos (ACCION) VALUES (CONCAT(Nombre_Jugador, " cobró $", @dinero_parada_libre, " de parada libre!"));
+    END IF;
+END$$
+
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Comprar_Casa` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN
     UPDATE jugadores SET dinero = dinero - (SELECT costo_casa FROM propiedades WHERE nombre = Nombre_Propiedad) WHERE nombre = (SELECT dueño FROM propiedades WHERE nombre = Nombre_Propiedad);
 	UPDATE propiedades SET nivel_renta = nivel_renta + 1 WHERE nombre = Nombre_Propiedad;
@@ -42,6 +51,25 @@ END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Consultar_Dinero_Neto` (IN `Nombre_Jugador` VARCHAR(30))   SELECT (SELECT dinero FROM jugadores WHERE nombre COLLATE utf8mb4_general_ci = Nombre_Jugador COLLATE utf8mb4_general_ci) + 
 (IFNULL((SELECT SUM(hipoteca) FROM propiedades WHERE dueño COLLATE utf8mb4_general_ci = Nombre_Jugador COLLATE utf8mb4_general_ci AND hipotecado = 0), 0))$$
+
+CREATE DEFINER=`admin`@`localhost` PROCEDURE `Consultar_Renta` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN
+	SET @nivel_renta = (SELECT nivel_renta FROM propiedades WHERE nombre = Nombre_Propiedad);
+	IF @nivel_renta = 1 THEN
+    	(SELECT renta FROM propiedades WHERE nombre = Nombre_Propiedad);
+    ELSEIF @nivel_renta = 2 THEN
+    	(SELECT renta_grupo FROM propiedades WHERE nombre = Nombre_Propiedad);
+    ELSEIF @nivel_renta = 3 THEN
+    	(SELECT renta_1 FROM propiedades WHERE nombre = Nombre_Propiedad);
+    ELSEIF @nivel_renta = 4 THEN
+    	(SELECT renta_2 FROM propiedades WHERE nombre = Nombre_Propiedad);
+    ELSEIF @nivel_renta = 5 THEN
+    	(SELECT renta_3 FROM propiedades WHERE nombre = Nombre_Propiedad);
+    ELSEIF @nivel_renta = 6 THEN
+    	(SELECT renta_4 FROM propiedades WHERE nombre = Nombre_Propiedad);
+    ELSEIF @nivel_renta = 7 THEN
+    	(SELECT renta_5 FROM propiedades WHERE nombre = Nombre_Propiedad);
+    END IF;
+END$$
 
 CREATE DEFINER=`admin`@`localhost` PROCEDURE `Crear_Jugador` (IN `vnombre` VARCHAR(30), IN `vpass` VARCHAR(50), IN `vdinero` INT(6), IN `vpasiva` VARCHAR(50))  COMMENT 'agregar un jugador y asignarle pasiva' BEGIN
     IF vnombre = '' OR vpass = '' THEN
@@ -61,19 +89,25 @@ CREATE DEFINER=`admin`@`localhost` PROCEDURE `Crear_Jugador` (IN `vnombre` VARCH
     END IF;
 END$$
 
+CREATE DEFINER=`admin`@`localhost` PROCEDURE `Dar_Propiedad_Trato` (IN `Nombre_Propiedad` VARCHAR(30), IN `Nombre_Jugador_Receptor` VARCHAR(30))   BEGIN
+	SET @dueno_anterior = (SELECT dueño FROM propiedades WHERE nombre = Nombre_Propiedad);
+	UPDATE propiedades SET dueño = Nombre_Jugador_Receptor WHERE nombre = Nombre_Propiedad;
+    INSERT INTO movimientos (accion) VALUES(concat(@dueno_anterior, " dio ", Nombre_Propiedad, " a ", Nombre_Jugador_Receptor)); 
+END$$
+
 CREATE DEFINER=`admin`@`localhost` PROCEDURE `Hipotecar_Propiedad` (IN `Nombre_Propiedad` VARCHAR(30))   BEGIN
     UPDATE propiedades SET hipotecado = 1 where nombre = Nombre_Propiedad;
     UPDATE jugadores SET dinero = dinero + (SELECT hipoteca FROM propiedades WHERE nombre = Nombre_Propiedad);
     INSERT INTO movimientos (accion) VALUES (CONCAT((SELECT dueño FROM propiedades WHERE nombre = Nombre_Propiedad), ' hipoteco ', Nombre_Propiedad));
 END$$
 
-CREATE DEFINER=`admin`@`localhost` PROCEDURE `Nuevo_Juego` (IN `v_impuestos_para_parada_libre` BOOLEAN, IN `v_dinero_inicio_personaliazdo` BOOLEAN, IN `v_dinero_inicio` INT, IN `v_bono_salida` BOOLEAN, IN `v_pasivas_activas` BOOLEAN, IN `v_modo_exponencial` BOOLEAN, IN `v_jugador_moderador` VARCHAR(30))   BEGIN
+CREATE DEFINER=`admin`@`localhost` PROCEDURE `Nuevo_Juego` (IN `v_impuestos_para_parada_libre` BOOLEAN, IN `v_dinero_inicio_personaliazdo` BOOLEAN, IN `v_dinero_inicio` INT, IN `v_bono_salida` BOOLEAN, IN `v_pasivas_activas` BOOLEAN, IN `v_modo_exponencial` BOOLEAN, IN `v_jugador_moderador` VARCHAR(30), IN `v_tratos_con_propiedades_disponibles` BOOLEAN)   BEGIN
     TRUNCATE TABLE jugadores;
     TRUNCATE TABLE MOVIMIENTOS;
     SELECT 'Limpiadas tablas de jugadores y movimientos' AS COMPLETADO;
     INSERT INTO movimientos (accion) VALUES ('Comienza el juego'); 
     UPDATE propiedades SET dueño = NULL, hipotecado = 0, nivel_renta = 1;
-    UPDATE variables SET impuestos_para_parada_libre = v_impuestos_para_parada_libre, dinero_inicio_personalizado = v_dinero_inicio_personaliazdo, dinero_inicio = v_dinero_inicio, acomulado_parada_libre = 0, bono_salida = v_bono_salida, pasivas_activas = v_pasivas_activas, modo_exponencial = v_modo_exponencial, jugador_moderador = v_jugador_moderador, multiplicador_exponencial = 1;
+    UPDATE variables SET impuestos_para_parada_libre = v_impuestos_para_parada_libre, dinero_inicio_personalizado = v_dinero_inicio_personaliazdo, dinero_inicio = v_dinero_inicio, acomulado_parada_libre = 0, bono_salida = v_bono_salida, pasivas_activas = v_pasivas_activas, modo_exponencial = v_modo_exponencial, jugador_moderador = v_jugador_moderador, multiplicador_exponencial = 1, tratos_con_propiedades_disponibles = v_tratos_con_propiedades_disponibles;
 END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Pagar_A_Banco` (IN `Nombre_Jugador` VARCHAR(30), IN `Monto_A_Pagar` INT(6))   BEGIN
@@ -95,13 +129,19 @@ END$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Pagar_impuestos` (IN `Nombre_Jugador` VARCHAR(30), IN `Monto_A_Pagar` INT(6), IN `Impuestos_Para_Parada_Libre` BOOLEAN)   BEGIN
 	IF Impuestos_Para_Parada_libre = 1 THEN
         UPDATE jugadores SET dinero = dinero - Monto_A_Pagar where nombre = Nombre_Jugador;
-        UPDATE variables SET acomiulado_parada_libre = acomulado_parada_libre + Monto_A_Pagar;
-        INSERT INTO movimientos (accion) VALUES (CONCAT(Nombre_Jugador, ' sumó ', Monto_A_Pagar, ' a parada libre'));
-        INSERT INTO movimientos (accion) VALUES (CONCAT('Premio parada libre: ', (SELECT parada_libre FROM variables)));
+        UPDATE variables SET acomulado_parada_libre = acomulado_parada_libre + Monto_A_Pagar;
+        INSERT INTO movimientos (accion) VALUES (CONCAT('Premio parada libre: $', (SELECT acomulado_parada_libre FROM variables)));
+        INSERT INTO movimientos (accion) VALUES (CONCAT(Nombre_Jugador, ' sumó $', Monto_A_Pagar, ' a parada libre'));
     ELSE
         UPDATE jugadores SET dinero = dinero - Monto_A_Pagar where nombre = Nombre_Jugador;
-        INSERT INTO movimientos (accion) VALUES (CONCAT(Nombre_Jugador, ' pagó ', Monto_A_Pagar, ' de impuestos'));
+        INSERT INTO movimientos (accion) VALUES (CONCAT(Nombre_Jugador, ' pagó $', Monto_A_Pagar, ' de impuestos'));
     END IF;
+END$$
+
+CREATE DEFINER=`admin`@`localhost` PROCEDURE `Pagar_Trato` (IN `Nombre_Jugador` VARCHAR(30), IN `Cantidad_Dinero` INT(6), IN `Nombre_Jugador_Receptor` VARCHAR(30))   BEGIN
+	UPDATE jugadores SET dinero = dinero - Cantidad_Dinero WHERE nombre = Nombre_Jugador;
+    UPDATE jugadores SET dinero = dinero + Cantidad_Dinero WHERE nombre = Nombre_JUgador_Receptor;
+    INSERT INTO movimientos (accion) VALUES (CONCAT(Nombre_Jugador, ' pagó $', Cantidad_Dinero, ' a ', Nombre_Jugador_Receptor, ' por trato'));
 END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Pago_A_Banco` (IN `nombre_jugador` VARCHAR(30), IN `monto_a_pagar` INT(6), IN `razón` VARCHAR(30))   BEGIN
@@ -133,9 +173,18 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `Recibir_Dinero_Vuelta` (IN `nombre_
     END IF;
 END$$
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `Recibir_Dinero_Vuelta_Doble` (IN `Nombre_Jugador` VARCHAR(30))   BEGIN 
-    UPDATE jugadores SET dinero = dinero + 400 WHERE nombre = Nombre_Jugador;
-    INSERT INTO MOVIMIENTOS(ACCION) VALUES(CONCAT(Nombre_Jugador, ' recibio $400 por vuelta doble!'));
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Recibir_Dinero_Vuelta_Doble` (IN `Nombre_Jugador` VARCHAR(30))   BEGIN
+	IF (SELECT modo_exponencial FROM variables) = 0 OR (SELECT modo_exponencial FROM variables) THEN
+	    UPDATE jugadores SET dinero = dinero + 400 WHERE nombre = nombre_jugador;
+    	INSERT INTO movimientos (accion) VALUES (CONCAT(nombre_jugador, ' recibio $400 por caer en salida!'));
+    ELSE
+	    UPDATE jugadores SET dinero = dinero + 400 WHERE nombre = nombre_jugador;
+    	INSERT INTO movimientos (accion) VALUES (CONCAT(nombre_jugador, ' recibio $400 por caer en salida!'));
+    	IF (SELECT JUGADOR_MODERADOR FROM VARIABLES) = nombre_jugador THEN
+	    	UPDATE VARIABLES SET multiplicador_exponencial = multiplicador_exponencial * 3;
+    		INSERT INTO movimientos (accion) VALUES (CONCAT('Rentas ahora son x', (SELECT multiplicador_exponencial FROM variables)));
+        END IF;
+    END IF;
 END$$
 
 CREATE DEFINER=`admin`@`localhost` PROCEDURE `Rendirse_Abandono` (IN `Nombre_Jugador` VARCHAR(30))   BEGIN
@@ -189,6 +238,15 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `Vender_Casa` (IN `Nombre_Propiedad`
 
 END$$
 
+--
+-- Funciones
+--
+CREATE DEFINER=`admin`@`localhost` FUNCTION `contarRegistros` () RETURNS INT(11)  BEGIN
+    DECLARE count INT;
+    SELECT COUNT(*) INTO count FROM nombre_tabla;
+    RETURN count;
+END$$
+
 DELIMITER ;
 
 -- --------------------------------------------------------
@@ -211,8 +269,9 @@ CREATE TABLE `jugadores` (
 --
 
 INSERT INTO `jugadores` (`nombre`, `contraseña`, `dinero`, `pasiva`, `turnos_restantes`, `activo`) VALUES
-('gato', 'gato', 1364, NULL, 0, 1),
-('polo', 'gato', 1196, NULL, 0, 1);
+('Bruneishon', 'Bruno', 1388, NULL, 0, 1),
+('Bruneishonn\'t', 'Bruno', 1500, NULL, 0, 1),
+('gato', 'gato', 1492, NULL, 0, 1);
 
 -- --------------------------------------------------------
 
@@ -231,31 +290,15 @@ CREATE TABLE `movimientos` (
 --
 
 INSERT INTO `movimientos` (`id`, `accion`, `tiempo`) VALUES
-(1, 'Comienza el juego', '2023-05-14 14:07:37'),
-(2, 'gato se unió, Dinero: $1500', '2023-05-14 14:07:37'),
-(3, 'polo se unió, Dinero: $1500', '2023-05-14 14:07:45'),
-(4, 'Rentas ahora son x2', '2023-05-14 14:07:55'),
-(5, 'Rentas ahora son x4', '2023-05-14 14:09:22'),
-(6, 'Rentas ahora son x8', '2023-05-14 14:10:03'),
-(7, 'Rentas ahora son x16', '2023-05-14 14:15:15'),
-(8, 'polo recibio $200 por dar una vuelta!', '2023-05-14 14:16:22'),
-(9, 'polo recibio $200 por dar una vuelta!', '2023-05-14 14:16:25'),
-(10, 'gato recibio $200 por dar una vuelta!', '2023-05-14 14:16:31'),
-(11, 'Rentas ahora son x32', '2023-05-14 14:16:31'),
-(12, 'polo compró Avenida Mediterraneo dinero: 1840', '2023-05-14 14:27:02'),
-(13, 'polo compró Avenida Baltica dinero: 1780', '2023-05-14 14:27:04'),
-(14, 'polo compró Ferrocarril de Reading dinero: 1580', '2023-05-14 14:27:06'),
-(15, 'polo compró Avenida Oriental dinero: 1480', '2023-05-14 14:27:22'),
-(16, 'polo compró Compañía de Electricidad dinero: 1330', '2023-05-14 14:27:27'),
-(17, 'gato pagó $2 a polo', '2023-05-14 14:59:02'),
-(18, 'gato pagó $64 a polo', '2023-05-14 15:00:48'),
-(19, 'polo compró Ferrocarril Pensilvania dinero: 1196', '2023-05-14 15:03:20'),
-(20, 'gato compró Avenida Vermont dinero: 1534', '2023-05-14 15:04:20'),
-(21, 'Avenida Vermont tiene una casa mas!', '2023-05-14 15:04:24'),
-(22, 'Avenida Vermont tiene una casa mas!', '2023-05-14 15:04:27'),
-(23, 'gato compró Avenida Connecticut', '2023-05-14 15:04:59'),
-(24, 'Avenida Vermont tiene una casa menos!', '2023-05-14 15:05:18'),
-(25, 'Avenida Vermont tiene una casa menos!', '2023-05-14 15:05:20');
+(1, 'Comienza el juego', '2023-05-17 15:10:44'),
+(2, 'Bruneishon se unió, Dinero: $1500', '2023-05-17 15:11:13'),
+(3, 'Bruneishonn\'t se unió, Dinero: $1500', '2023-05-17 15:11:58'),
+(4, 'Bruneishon compró Avenida Mediterraneo', '2023-05-17 15:12:28'),
+(5, 'Bruneishon compró Avenida Baltica', '2023-05-17 15:13:14'),
+(6, 'gato se unió, Dinero: $1500', '2023-05-17 15:17:02'),
+(7, 'gato pagó $2 a Bruneishon', '2023-05-17 15:20:15'),
+(8, 'gato pagó $2 a Bruneishon', '2023-05-17 15:20:16'),
+(9, 'gato pagó $4 a Bruneishon', '2023-05-17 15:20:23');
 
 -- --------------------------------------------------------
 
@@ -323,17 +366,17 @@ CREATE TABLE `propiedades` (
 --
 
 INSERT INTO `propiedades` (`id`, `nombre`, `color`, `precio`, `renta`, `renta_grupo`, `renta_1`, `renta_2`, `renta_3`, `renta_4`, `renta_5`, `costo_casa`, `hipoteca`, `costo_deshipoteca`, `dueño`, `hipotecado`, `nivel_renta`) VALUES
-(1, 'Avenida Mediterraneo', 'Marron', 60, 2, 0, 0, 0, 0, 0, 0, 50, 30, 33, 'polo', 0, 1),
-(2, 'Avenida Baltica', 'Marron', 60, 4, 0, 0, 0, 0, 0, 0, 50, 30, 33, 'polo', 0, 1),
-(3, 'Ferrocarril de Reading', 'Negro', 200, 6, 0, 0, 0, 0, 0, 0, NULL, 100, 110, 'polo', 0, 1),
-(4, 'Avenida Oriental', 'Celeste', 100, 6, 0, 0, 0, 0, 0, 0, 50, 50, 55, 'polo', 0, 1),
-(5, 'Avenida Vermont', 'Celeste', 100, 8, 0, 0, 0, 0, 0, 0, 50, 50, 55, 'gato', 0, 1),
-(6, 'Avenida Connecticut', 'Celeste', 120, 10, 0, 0, 0, 0, 0, 0, 50, 60, 66, 'gato', 0, 1),
+(1, 'Avenida Mediterraneo', 'Marron', 60, 2, 4, 10, 30, 90, 160, 250, 50, 30, 33, 'Bruneishon', 0, 1),
+(2, 'Avenida Baltica', 'Marron', 60, 4, 8, 20, 60, 180, 320, 450, 50, 30, 33, 'Bruneishon', 0, 1),
+(3, 'Ferrocarril de Reading', 'Negro', 200, 6, 0, 0, 0, 0, 0, 0, NULL, 100, 110, NULL, 0, 1),
+(4, 'Avenida Oriental', 'Celeste', 100, 6, 12, 30, 90, 270, 400, 550, 50, 50, 55, NULL, 0, 1),
+(5, 'Avenida Vermont', 'Celeste', 100, 6, 12, 30, 90, 270, 400, 550, 50, 50, 55, NULL, 0, 1),
+(6, 'Avenida Connecticut', 'Celeste', 120, 6, 12, 40, 100, 300, 450, 600, 50, 60, 66, NULL, 0, 1),
 (7, 'Plaza San Carlos', 'Morado', 140, 10, 0, 0, 0, 0, 0, 0, 100, 70, 77, NULL, 0, 1),
-(8, 'Compañía de Electricidad', 'Servicio', 150, 1, 0, 0, 0, 0, 0, 0, NULL, 75, 83, 'polo', 0, 1),
+(8, 'Compañía de Electricidad', 'Servicio', 150, 1, 0, 0, 0, 0, 0, 0, NULL, 75, 83, NULL, 0, 1),
 (9, 'Avenida Estados', 'Morado', 140, 0, 0, 0, 0, 0, 0, 0, 100, 70, 77, NULL, 0, 1),
 (10, 'Avenida Virginia', 'Morado', 160, 0, 0, 0, 0, 0, 0, 0, 100, 80, 88, NULL, 0, 1),
-(11, 'Ferrocarril Pensilvania', 'Negro', 200, 0, 0, 0, 0, 0, 0, 0, NULL, 100, 110, 'polo', 0, 1),
+(11, 'Ferrocarril Pensilvania', 'Negro', 200, 0, 0, 0, 0, 0, 0, 0, NULL, 100, 110, NULL, 0, 1),
 (12, 'Avenida San James', 'Naranja', 180, 0, 0, 0, 0, 0, 0, 0, 100, 90, 99, NULL, 0, 1),
 (13, 'Avenida Tennessee', 'Naranja', 180, 0, 0, 0, 0, 0, 0, 0, 100, 90, 99, NULL, 0, 1),
 (14, 'Avenida Nueva York', 'Naranja', 200, 0, 0, 0, 0, 0, 0, 0, 100, 100, 110, NULL, 0, 1),
@@ -367,15 +410,16 @@ CREATE TABLE `variables` (
   `pasivas_activas` tinyint(1) NOT NULL DEFAULT 0,
   `modo_exponencial` tinyint(1) NOT NULL DEFAULT 0,
   `jugador_moderador` varchar(30) DEFAULT NULL,
-  `multiplicador_exponencial` int(4) NOT NULL DEFAULT 1
+  `multiplicador_exponencial` int(4) NOT NULL DEFAULT 1,
+  `tratos_con_propiedades_disponibles` tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `variables`
 --
 
-INSERT INTO `variables` (`impuestos_para_parada_libre`, `acomulado_parada_libre`, `dinero_inicio_personalizado`, `dinero_inicio`, `bono_salida`, `pasivas_activas`, `modo_exponencial`, `jugador_moderador`, `multiplicador_exponencial`) VALUES
-(0, 0, 0, 1500, 1, 0, 1, 'gato', 32);
+INSERT INTO `variables` (`impuestos_para_parada_libre`, `acomulado_parada_libre`, `dinero_inicio_personalizado`, `dinero_inicio`, `bono_salida`, `pasivas_activas`, `modo_exponencial`, `jugador_moderador`, `multiplicador_exponencial`, `tratos_con_propiedades_disponibles`) VALUES
+(0, 0, 0, 1500, 0, 0, 0, NULL, 1, 1);
 
 -- --------------------------------------------------------
 
@@ -425,7 +469,7 @@ ALTER TABLE `propiedades`
 -- AUTO_INCREMENT de la tabla `movimientos`
 --
 ALTER TABLE `movimientos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT de la tabla `pasivas`

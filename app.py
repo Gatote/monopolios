@@ -268,7 +268,7 @@ with st.container():
             else:
                 st.success('Ya puedes cerrar esta pestaña')
     else:
-        st.warning("No hay usuarios registrados en el juego")
+        st.warning("No hay jugadores registrados en el juego")
         Credenciales_Validas = False
 
     if Credenciales_Validas:
@@ -322,10 +322,10 @@ with st.container():
         st.header('Cobros')
         st.subheader('Banco')
         from Cobros_A_Banco import main as Cobros_A_banco_main
-        Cobros_A_banco_main(Nombre_Jugador, Bono_Salida)
+        Cobros_A_banco_main(Nombre_Jugador, Bono_Salida, Impuestos_Para_Parada_Libre, Acomulado_Parada_Libre)
 
         st.header('Tratos con jugadores')
-        if tratos_con_propiedades_disponibles == False:
+        if tratos_con_propiedades_disponibles == False or Consultar_Propiedades() == False:
             from Tratos_Con_Jugadores import main as Tratos_Con_Jugadores_main
             Tratos_Con_Jugadores_main(Nombre_Jugador, Dinero_Jugador)
         elif Consultar_Propiedades():
