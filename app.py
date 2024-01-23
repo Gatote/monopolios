@@ -14,15 +14,17 @@ st.set_page_config(
         'About': "# This is a header. This is an *extremely* cool app!"
     }
 )
-
-# Establecer una conexión a la base de datos
-conn = mysql.connector.connect(
-    host="localhost",
-    user="admin",
-    password="admin",
-    database="monopolios"
-)
-
+try:
+    # Establecer una conexión a la base de datos
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="admin",
+        password="admin",
+        database="monopolios"
+    )
+except:
+    st.error("Error al conectar al servidor (monopolios.db)")
+    exit()
     
 
 
@@ -308,7 +310,7 @@ with st.container():
 
         st.header('Gastos')
         st.subheader('Propiedades')
-        from Comprar_Propiedad import main as comprar_propiedad_main
+        from comprar_propiedad import main as comprar_propiedad_main
         comprar_propiedad_main(jugador, Dinero_Jugador)
 
         st.subheader('Pagos a jugadores')

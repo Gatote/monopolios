@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 18-05-2023 a las 21:44:41
+-- Tiempo de generación: 23-01-2024 a las 01:24:32
 -- Versión del servidor: 10.4.28-MariaDB
 -- Versión de PHP: 8.2.4
 
@@ -250,7 +250,7 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `Recibir_Dinero_Vuelta_Doble` (IN `N
     ELSE
 	    UPDATE jugadores SET dinero = dinero + 400 WHERE nombre = nombre_jugador;
     	INSERT INTO movimientos (accion) VALUES (CONCAT(nombre_jugador, ' recibio $400 por caer en salida!'));
-    	IF (SELECT JUGADOR_MODERADOR FROM VARIABLES) = nombre_jugador THEN
+    	IF (SELECT JUGADOR_MODERADOR FROM VARIABLES) = Nombre_jugador THEN
 	    	UPDATE VARIABLES SET multiplicador_exponencial = multiplicador_exponencial * 3;
     		INSERT INTO movimientos (accion) VALUES (CONCAT('Rentas ahora son x', (SELECT multiplicador_exponencial FROM variables)));
         END IF;
@@ -339,7 +339,9 @@ CREATE TABLE `jugadores` (
 --
 
 INSERT INTO `jugadores` (`nombre`, `contraseña`, `dinero`, `pasiva`, `turnos_restantes`, `activo`) VALUES
-('gato', 'gato', 705, NULL, 0, 1);
+('Gato', 'gato', 2175, NULL, 0, 1),
+('Erika', 'gato', 895, NULL, 0, 1),
+('mon', 'gato', 1495, NULL, 0, 1);
 
 -- --------------------------------------------------------
 
@@ -358,38 +360,39 @@ CREATE TABLE `movimientos` (
 --
 
 INSERT INTO `movimientos` (`id`, `accion`, `tiempo`) VALUES
-(1, 'Comienza el juego', '2023-05-17 21:05:38'),
-(2, 'gato se unió, Dinero: $1500', '2023-05-18 11:26:17'),
-(3, 'gato pagó $100 de impuestos', '2023-05-18 11:35:05'),
-(4, 'gato compró Avenida Mediterraneo', '2023-05-18 11:45:33'),
-(5, 'gato compró Avenida Baltica', '2023-05-18 11:45:35'),
-(6, 'gato hizo el grupo de color Marron!', '2023-05-18 11:45:37'),
-(7, 'Avenida Mediterraneo tiene una casa mas!', '2023-05-18 11:47:47'),
-(8, 'Avenida Mediterraneo tiene una casa mas!', '2023-05-18 12:23:28'),
-(9, 'Avenida Mediterraneo tiene una casa mas!', '2023-05-18 12:23:42'),
-(10, 'Avenida Mediterraneo tiene una casa mas!', '2023-05-18 12:23:47'),
-(11, 'Avenida Baltica tiene una casa mas!', '2023-05-18 12:23:57'),
-(12, 'Avenida Baltica tiene una casa mas!', '2023-05-18 12:23:59'),
-(13, 'Avenida Baltica tiene una casa mas!', '2023-05-18 12:24:01'),
-(14, 'Avenida Mediterraneo tiene una casa menos!', '2023-05-18 12:25:29'),
-(15, 'Avenida Mediterraneo tiene una casa menos!', '2023-05-18 12:25:29'),
-(16, 'Avenida Mediterraneo tiene una casa menos!', '2023-05-18 12:25:29'),
-(17, 'Avenida Mediterraneo tiene una casa menos!', '2023-05-18 12:25:29'),
-(18, 'Avenida Mediterraneo tiene una casa menos!', '2023-05-18 12:25:29'),
-(19, 'Avenida Baltica tiene una casa menos!', '2023-05-18 12:25:33'),
-(20, 'Avenida Baltica tiene una casa menos!', '2023-05-18 12:25:33'),
-(21, 'Avenida Baltica tiene una casa menos!', '2023-05-18 12:25:34'),
-(22, 'Avenida Baltica tiene una casa menos!', '2023-05-18 12:25:34'),
-(23, 'gato hizo el grupo de color Marron!', '2023-05-18 12:25:55'),
-(24, 'Avenida Baltica tiene una casa mas!', '2023-05-18 12:26:15'),
-(25, 'Avenida Baltica tiene una casa mas!', '2023-05-18 12:26:28'),
-(26, 'Avenida Baltica tiene una casa mas!', '2023-05-18 12:58:39'),
-(27, 'Avenida Mediterraneo tiene una casa mas!', '2023-05-18 12:58:45'),
-(28, 'Avenida Baltica tiene una casa mas!', '2023-05-18 13:05:08'),
-(29, 'Avenida Mediterraneo tiene una casa mas!', '2023-05-18 13:05:13'),
-(30, 'Avenida Baltica tiene una casa mas!', '2023-05-18 13:05:59'),
-(31, 'Avenida Baltica tiene una casa mas!', '2023-05-18 13:06:42'),
-(32, 'Avenida Mediterraneo tiene una casa mas!', '2023-05-18 13:06:46');
+(1, 'Comienza el juego', '2023-12-25 20:42:04'),
+(2, 'Gato se unió, Dinero: $1500', '2023-12-25 20:42:28'),
+(3, 'Erika se unió, Dinero: $1500', '2023-12-25 20:42:44'),
+(4, 'mon se unió, Dinero: $1500', '2023-12-25 20:42:52'),
+(5, 'Gato compró Avenida Mediterraneo', '2023-12-25 20:43:09'),
+(6, 'Gato compró Avenida Baltica', '2023-12-25 20:43:12'),
+(7, 'Erika compró Ferrocarril de Reading', '2023-12-25 20:43:23'),
+(8, 'Erika compró Ferrocarril Pensilvania', '2023-12-25 20:43:27'),
+(9, 'Erika compró Ferrocarril B&O', '2023-12-25 20:43:34'),
+(10, 'Erika compró Ferrocarril Via Rápida', '2023-12-25 20:43:37'),
+(11, 'Gato hizo el grupo de color Marron!', '2023-12-25 20:43:58'),
+(12, 'Avenida Mediterraneo tiene una casa mas!', '2023-12-25 20:44:40'),
+(13, 'Avenida Baltica tiene una casa mas!', '2023-12-25 20:44:45'),
+(14, 'Avenida Baltica tiene una casa mas!', '2023-12-25 20:44:48'),
+(15, 'Avenida Mediterraneo tiene una casa mas!', '2023-12-25 20:44:50'),
+(16, 'Avenida Mediterraneo tiene una casa mas!', '2023-12-25 20:45:45'),
+(17, 'Avenida Baltica tiene una casa mas!', '2023-12-25 20:45:50'),
+(18, 'Avenida Baltica tiene una casa mas!', '2023-12-25 20:45:53'),
+(19, 'Avenida Mediterraneo tiene una casa mas!', '2023-12-25 20:46:01'),
+(20, 'Avenida Mediterraneo tiene una casa mas!', '2023-12-25 20:46:28'),
+(21, 'Avenida Baltica tiene una casa mas!', '2023-12-25 20:46:35'),
+(22, 'Gato compró Avenida Oriental', '2023-12-25 20:46:54'),
+(23, 'Erika recibio $200 por dar una vuelta!', '2023-12-25 20:49:03'),
+(24, 'Gato recibio $200 por dar una vuelta!', '2023-12-25 20:50:08'),
+(25, 'Rentas ahora son x2', '2023-12-25 20:50:08'),
+(26, 'Gato recibio $200 por dar una vuelta!', '2023-12-25 20:50:11'),
+(27, 'Rentas ahora son x4', '2023-12-25 20:50:11'),
+(28, 'Gato recibio $400 por caer en salida!', '2023-12-25 20:50:16'),
+(29, 'Gato recibio $200 por dar una vuelta!', '2023-12-25 20:50:31'),
+(30, 'Rentas ahora son x8', '2023-12-25 20:50:31'),
+(31, 'Gato recibio $400 por caer en salida!', '2023-12-25 22:10:59'),
+(32, 'Gato hipoteco Avenida Oriental', '2023-12-25 22:12:16'),
+(33, 'Gato deshipotecó Avenida Oriental', '2023-12-25 22:12:59');
 
 -- --------------------------------------------------------
 
@@ -457,24 +460,24 @@ CREATE TABLE `propiedades` (
 --
 
 INSERT INTO `propiedades` (`id`, `nombre`, `color`, `precio`, `renta`, `renta_grupo`, `renta_1`, `renta_2`, `renta_3`, `renta_4`, `renta_5`, `costo_casa`, `hipoteca`, `costo_deshipoteca`, `dueño`, `hipotecado`, `nivel_renta`) VALUES
-(1, 'Avenida Mediterraneo', 'Marron', 60, 2, 4, 10, 30, 90, 160, 250, 50, 30, 33, 'gato', 0, 7),
-(2, 'Avenida Baltica', 'Marron', 60, 4, 8, 20, 60, 180, 320, 450, 50, 30, 33, 'gato', 0, 7),
-(3, 'Ferrocarril de Reading', 'Negro', 200, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 100, 110, NULL, 0, 1),
-(4, 'Avenida Oriental', 'Celeste', 100, 6, 12, 30, 90, 270, 400, 550, 50, 50, 55, NULL, 0, 1),
+(1, 'Avenida Mediterraneo', 'Marron', 60, 2, 4, 10, 30, 90, 160, 250, 50, 30, 33, 'Gato', 0, 7),
+(2, 'Avenida Baltica', 'Marron', 60, 4, 8, 20, 60, 180, 320, 450, 50, 30, 33, 'Gato', 0, 7),
+(3, 'Ferrocarril de Reading', 'Negro', 200, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 100, 110, 'Erika', 0, 1),
+(4, 'Avenida Oriental', 'Celeste', 100, 6, 12, 30, 90, 270, 400, 550, 50, 50, 55, 'Gato', 0, 1),
 (5, 'Avenida Vermont', 'Celeste', 100, 6, 12, 30, 90, 270, 0, 550, 50, 50, 55, NULL, 0, 1),
 (6, 'Avenida Connecticut', 'Celeste', 120, 6, 12, 40, 100, 300, 450, 600, 50, 60, 66, NULL, 0, 1),
 (7, 'Plaza San Carlos', 'Morado', 140, 10, 20, 50, 150, 450, 625, 750, 100, 70, 77, NULL, 0, 1),
 (8, 'Compañía de Electricidad', 'Servicio', 150, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 75, 83, NULL, 0, 1),
 (9, 'Avenida Estados', 'Morado', 140, 10, 20, 50, 150, 450, 625, 750, 100, 70, 77, NULL, 0, 1),
 (10, 'Avenida Virginia', 'Morado', 160, 12, 24, 60, 180, 500, 500, 700, 100, 80, 88, NULL, 0, 1),
-(11, 'Ferrocarril Pensilvania', 'Negro', 200, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 100, 110, NULL, 0, 1),
+(11, 'Ferrocarril Pensilvania', 'Negro', 200, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 100, 110, 'Erika', 0, 1),
 (12, 'Avenida San James', 'Naranja', 180, 14, 28, 70, 200, 550, 750, 950, 100, 90, 99, NULL, 0, 1),
 (13, 'Avenida Tennessee', 'Naranja', 180, 14, 28, 70, 20, 550, 750, 950, 100, 90, 99, NULL, 0, 1),
 (14, 'Avenida Nueva York', 'Naranja', 200, 16, 32, 80, 220, 600, 800, 1000, 100, 100, 110, NULL, 0, 1),
 (15, 'Avenida Kentucky', 'Rojo', 220, 18, 36, 90, 250, 700, 875, 1050, 150, 110, 110, NULL, 0, 1),
 (16, 'Avenida Indiana', 'Rojo', 220, 18, 36, 90, 250, 700, 875, 1050, 150, 110, 110, NULL, 0, 1),
 (17, 'Avenida Illinois', 'Rojo', 240, 20, 40, 100, 300, 750, 925, 1100, 150, 120, 142, NULL, 0, 1),
-(18, 'Ferrocarril B&O', 'Negro', 200, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 100, 110, NULL, 0, 1),
+(18, 'Ferrocarril B&O', 'Negro', 200, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 100, 110, 'Erika', 0, 1),
 (19, 'Avenida Atlantico', 'Amarillo', 260, 22, 44, 110, 330, 800, 975, 1150, 150, 130, 143, NULL, 0, 1),
 (20, 'Avenida Ventnor', 'Amarillo', 260, 22, 44, 110, 330, 800, 975, 1150, 150, 130, 143, NULL, 0, 1),
 (21, 'Compañía de Agua', 'Servicio', 150, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 75, 83, NULL, 0, 1),
@@ -482,7 +485,7 @@ INSERT INTO `propiedades` (`id`, `nombre`, `color`, `precio`, `renta`, `renta_gr
 (23, 'Avenida Pacifico', 'Verde', 300, 26, 52, 130, 390, 900, 1100, 1275, 200, 150, 165, NULL, 0, 1),
 (24, 'Avenida Carolina del Norte', 'Verde', 300, 26, 52, 130, 390, 900, 1100, 1275, 200, 150, 165, NULL, 0, 1),
 (25, 'Avenida Pensilvania', 'Verde', 320, 28, 56, 150, 450, 1000, 1200, 1400, 200, 160, 175, NULL, 0, 1),
-(26, 'Ferrocarril Via Rápida', 'Negro', 200, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 100, 110, NULL, 0, 1),
+(26, 'Ferrocarril Via Rápida', 'Negro', 200, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 100, 110, 'Erika', 0, 1),
 (27, 'Plaza Park', 'Azul', 350, 35, 70, 175, 500, 1100, 1300, 1500, 200, 175, 193, NULL, 0, 1),
 (28, 'El Muelle', 'Azul', 400, 50, 100, 200, 600, 1400, 1700, 2000, 200, 200, 220, NULL, 0, 1);
 
@@ -510,7 +513,7 @@ CREATE TABLE `variables` (
 --
 
 INSERT INTO `variables` (`impuestos_para_parada_libre`, `acomulado_parada_libre`, `dinero_inicio_personalizado`, `dinero_inicio`, `bono_salida`, `pasivas_activas`, `modo_exponencial`, `jugador_moderador`, `multiplicador_exponencial`, `tratos_con_propiedades_disponibles`) VALUES
-(0, 0, 0, 1500, 0, 0, 0, NULL, 1, 1);
+(0, 0, 0, 1500, 1, 0, 1, 'Gato', 8, 0);
 
 -- --------------------------------------------------------
 
@@ -560,7 +563,7 @@ ALTER TABLE `propiedades`
 -- AUTO_INCREMENT de la tabla `movimientos`
 --
 ALTER TABLE `movimientos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
 
 --
 -- AUTO_INCREMENT de la tabla `pasivas`

@@ -88,7 +88,7 @@ def main():
         
         
         t_confirmar1=st.text_input('Clave',key='txt_reseteo1',type='password')
-        if st.button('Confirmar', key='btn_resteo', disabled = t_confirmar1 != 'bruno'):
+        if st.button('Confirmar', key='btn_resteo', disabled = t_confirmar1 != 'Confirmar'):
             nuevo_juego(Input_Impuestos_Para_Parada_Libre, Input_Personalizar_Dinero_Inicio, Input_Personalizar_Dinero_Inicio_Cantidad, Input_Bono_Salida, Input_Pasivas_Activas, Input_Modo_Exponencial, Input_Jugador_Moderador, tratos_con_propiedades_disponibles)
             # if Input_Modo_Exponencial:
             #     Crear_Jugador(Input_Jugador_Moderador, Input_Jugador_Moderador_contraseña, Input_Personalizar_Dinero_Inicio_Cantidad, Jugador_Pasiva)
